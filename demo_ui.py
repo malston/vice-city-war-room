@@ -8,6 +8,7 @@ arguments (nothing from the browser reaches a shell). Binds to localhost only.
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -187,6 +188,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    server = ThreadingHTTPServer(("127.0.0.1", 8765), Handler)
-    print("Demo UI on http://127.0.0.1:8765")
+    port = int(os.environ.get("DEMO_UI_PORT", "8765"))
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    print(f"Demo UI on http://127.0.0.1:{port}")
     server.serve_forever()
