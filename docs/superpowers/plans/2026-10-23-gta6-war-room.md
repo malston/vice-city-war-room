@@ -4,7 +4,7 @@
 
 **Goal:** A heist-crew swarm that turns teammates' chat replies into personal launch plans and a team scoreboard, checked by a critic before anything is posted.
 
-**Architecture:** The starter's flat scripts stay (create agents, upload skills, run a session). Testable logic moves into a small `war_room/` package. Five slices meet only at the file contracts in Task 0, so five people can work in parallel. Slack stays outside the code: the owner's Claude session reads replies and posts approved drafts.
+**Architecture:** The starter's flat scripts stay (create agents, upload skills, run a session). Testable logic moves into a small `war_room/` package. Six slices meet only at the file contracts in Task 0, so six people can work in parallel. Slack stays outside the code: the owner's Claude session reads replies and posts approved drafts.
 
 **Tech Stack:** Python 3, `anthropic` SDK with Managed Agents multi-agent (beta header `managed-agents-2026-04-01`), pytest.
 
@@ -39,6 +39,7 @@
 | `synthetic-data/launch-facts.md`, `skills/<name>/SKILL.md` (7 skills)                                                                 | 3     | Facts, playbooks, voice, rubric, template |
 | `war_room/checks.py`, `check_outputs.py`, `create_cleaner.py`, `dry_run.py`, `synthetic-data/profiles/`, `tests/live/`                | 4     | Quality gate and dry run                  |
 | `war_room/movers.py`, `movers.py`, `war_room/post_queue.py`, `post_queue.py`, `docs/posting.md`                                       | 5     | Round movers and the approved-post queue  |
+| `war_room/fake_slack.py`, `fake_slack.py`, `demo/seed-round-1.json`, `docs/demo.md`                                                   | 6     | A fake Slack channel for demos            |
 
 Each slice branches from `main` as `slice-N-<name>` and opens its own PR.
 
@@ -405,9 +406,82 @@ Rules: order is people by handle, then the scoreboard, then movers when `movers.
 
 ---
 
-## Task 18: Integration (Mark, after the five PRs merge)
+# Slice 6: Fake Slack (terminal)
+
+Only new files. A stand-in channel so the whole demo runs with no Slack connection. It runs on the standard library, needs no API key, and uses only fictional people. A browser view is a later stretch and is not part of this slice.
+
+## Task 18: Channel store
+
+**Files:**
+
+- Create: `war_room/fake_slack.py`, `tests/test_fake_slack.py`
+
+**Interfaces:**
+
+- Produces: `BOT_HANDLE = "war-room"`, `BOT_NAME = "War Room"`, `DEFAULT_CHANNEL = Path("outputs/demo/channel.json")`.
+- `load_channel(path: Path) -> list[dict]`: a missing file gives `[]`; invalid JSON raises `ValueError` naming the path.
+- `save_channel(path: Path, messages: list[dict]) -> None`: creates parent folders.
+- `next_ts(messages: list[dict], now: float) -> str`: six decimals, always strictly greater than the last message's `ts`.
+- `add_message(messages: list[dict], handle: str, name: str, text: str, now: float) -> tuple[list[dict], dict]`: returns the new list and the new message; blank text raises `ValueError`.
+- `read_since(messages: list[dict], since: str | None, include_bot: bool = False) -> list[dict]`: messages with `ts` after `since` (compared as numbers), bot posts left out unless asked.
+- `format_message(message: dict, tz: tzinfo | None = None) -> str`: `HH:MM Name: text`, with continuation lines indented.
+- `first_fenced_block(markdown: str) -> str`: the text inside the first code fence; raises `ValueError` when there is none.
+- Messages use the saved-messages format from `docs/contracts.md`: `author_handle`, `author_name`, `ts`, `text`.
+
+- [ ] **Step 1: Write failing tests** in `tests/test_fake_slack.py`:
+  - `test_load_channel_returns_empty_list_when_the_file_is_missing` and `test_load_channel_raises_value_error_naming_the_path_on_invalid_json`.
+  - `test_save_then_load_round_trips_and_creates_parent_folders`.
+  - `test_next_ts_is_now_for_an_empty_channel` (`now=1700000000.5` gives `"1700000000.500000"`) and `test_next_ts_is_strictly_greater_than_the_last_message_even_if_the_clock_goes_backwards`.
+  - `test_add_message_appends_in_order_and_returns_the_new_message` and `test_add_message_rejects_blank_text`.
+  - `test_read_since_compares_timestamps_numerically` (`"999.1"` is before `"1792773218.446639"`), `test_read_since_none_returns_everything`, `test_read_since_leaves_out_bot_posts_by_default`, and `test_read_since_can_include_bot_posts`.
+  - `test_format_message_shows_time_name_and_text` (with `tz=timezone.utc`) and `test_format_message_indents_continuation_lines`.
+  - `test_first_fenced_block_returns_the_post_text` and `test_first_fenced_block_raises_value_error_when_there_is_no_fence`.
+- [ ] **Step 2: Run** `python -m pytest tests/test_fake_slack.py -v`. Expected: FAIL, module not found.
+- [ ] **Step 3: Implement `war_room/fake_slack.py`.** Pure functions that return new lists and never edit in place. The clock is a parameter, so tests pass fixed values.
+- [ ] **Step 4: Run** `python -m pytest -q`. Expected: all PASS, no warnings.
+- [ ] **Step 5: Commit** (`feat: add the fake channel store`).
+
+## Task 19: Commands, seed, and demo guide
+
+**Files:**
+
+- Create: `fake_slack.py`, `demo/seed-round-1.json`, `docs/demo.md`, `tests/test_fake_slack_cli.py`
+
+**Interfaces:**
+
+- Consumes: everything from Task 18.
+- Produces: `main(argv: list[str] | None = None) -> int` with a global `--channel FILE` (default `outputs/demo/channel.json`) and these subcommands:
+  - `post (--file FILE | --text TEXT) [--fenced] [--as HANDLE] [--name NAME]`: author defaults to `war-room` and `War Room`; `--fenced` posts only the first code fence of the file; prints `ts: <ts>` on its own line.
+  - `reply --as HANDLE --text TEXT [--name NAME]`: `--name` defaults to the handle in title case; prints `ts: <ts>`.
+  - `read [--since TS] --out FILE [--include-bot]`: writes the saved-messages file and prints `Saved N message(s) to FILE`.
+  - `show [--since TS]`: prints every message with `format_message`.
+  - `seed [--file FILE] [--delay SECONDS]`: appends the scripted replies after the last message with fresh timestamps, waiting `--delay` seconds between them; the default file is `demo/seed-round-1.json`; prints `Seeded N message(s)`.
+  - `reset`: clears the channel, and is safe when it is already empty.
+- `demo/seed-round-1.json` is a JSON list of `{"author_handle", "author_name", "text"}` for five fictional people (`jules`, `mara`, `otto`, `pia`, `sol`). One reply uses Slack bold labels, one is partial, one person replies twice with an update, and one is mostly blank labels.
+
+- [ ] **Step 1: Write failing tests** in `tests/test_fake_slack_cli.py`, with a channel file in `tmp_path` and captured output:
+  - `test_post_with_text_prints_the_ts_and_stores_a_message_from_the_bot`, `test_post_with_file_posts_the_file_text`, and `test_post_with_fenced_posts_only_the_fenced_block`.
+  - `test_post_requires_file_or_text` (exit code 2).
+  - `test_reply_stores_the_handle_and_defaults_the_name_to_title_case`.
+  - `test_read_writes_exactly_the_four_saved_message_keys_and_reports_the_count`, `test_read_since_returns_only_later_messages`, and `test_read_leaves_out_the_bot_unless_asked`.
+  - `test_show_prints_every_message`.
+  - `test_seed_appends_after_existing_messages_with_increasing_timestamps` and `test_seed_with_a_small_delay_still_seeds_everything` (`--delay 0.01`).
+  - `test_committed_seed_file_has_five_distinct_handles_and_labeled_text`.
+  - `test_reset_clears_the_channel_and_is_safe_when_already_empty`.
+  - `test_missing_post_file_exits_with_message` and `test_corrupt_channel_file_exits_with_message`.
+- [ ] **Step 2: Run** `python -m pytest tests/test_fake_slack_cli.py -v`. Expected: FAIL, module not found.
+- [ ] **Step 3: Implement `fake_slack.py`** in the starter's script style: argparse subcommands, `SystemExit` messages for a missing file, a corrupt channel file, or blank text.
+- [ ] **Step 4: Write `demo/seed-round-1.json`** as described in the Interfaces block.
+- [ ] **Step 5: Write `docs/demo.md`:** the terminal walk-through in order: `reset`; `post --file docs/kickoff-post.md --fenced` and keep the printed `ts` as the kickoff timestamp; `seed --delay 2` while the audience watches `show` in a second terminal; `read --since <ts> --out outputs/messages.json`; `parse_profiles.py`; `run_war_room.py`; `check_outputs.py`; then `post --file outputs/round-1/<handle>.md` for each approved plan. Say that `read` leaves out the bot's own posts, so the plans posted in an earlier round never become profiles.
+- [ ] **Step 6: Run** `python -m pytest -q`. Expected: all PASS, no warnings.
+- [ ] **Step 7: Commit** (`feat: add the fake Slack commands and demo guide`), open a PR.
+
+---
+
+## Task 20: Integration (Mark, after the six PRs merge)
 
 - [ ] **Step 1:** Run the setup order from Task 0, then `python dry_run.py`. Expected: PASS.
 - [ ] **Step 2:** Ask Mark before deleting the deal-desk leftovers: `run_deal_desk.py`, `stretch_critic_subagent.py`, `skills/pricing-playbook`, `skills/legal-checklist`, `skills/competitive-intel`, `synthetic-data/rfp-acme-corp.md`, `synthetic-data/past-wins.json`, `synthetic-data/product-overview.md`. Delete only what Mark approves.
 - [ ] **Step 3:** Point step 6 of `docs/runbook.md` at `docs/posting.md` and add the `movers.py` command to the runbook for rounds 2 and 3.
-- [ ] **Step 4:** Draft the kickoff post from `docs/kickoff-post.md` and show it to Mark. Post only after approval.
+- [ ] **Step 4:** Walk through `docs/demo.md` end to end against the fake channel. Expected: the seeded replies become five profiles, the round runs, and the approved plans appear in `python fake_slack.py show`. Then link `docs/demo.md` from the README.
+- [ ] **Step 5:** Draft the kickoff post from `docs/kickoff-post.md` and show it to Mark. Post only after approval.

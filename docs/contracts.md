@@ -71,6 +71,19 @@ python run_war_room.py --round N --profiles DIR [--facts FILE] [--prior-scoreboa
 
 `--out` defaults to `outputs/round-N`.
 
+## Demo channel
+
+For demos without Slack, `fake_slack.py` keeps a channel in `outputs/demo/channel.json` (override with `--channel FILE`). It is a JSON list of messages in the saved-messages format. `fake_slack.py read` writes the saved-messages file that `parse_profiles.py` reads and leaves out the bot's own posts (handle `war-room`). Other slices ignore this file.
+
+```text
+python fake_slack.py post (--file FILE | --text TEXT) [--fenced] [--as HANDLE] [--name NAME]
+python fake_slack.py reply --as HANDLE --text TEXT [--name NAME]
+python fake_slack.py read [--since TS] --out FILE [--include-bot]
+python fake_slack.py show [--since TS]
+python fake_slack.py seed [--file FILE] [--delay SECONDS]
+python fake_slack.py reset
+```
+
 ## Setup order
 
 1. `python create_specialists.py`
