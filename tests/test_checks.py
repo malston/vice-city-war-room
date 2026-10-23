@@ -350,3 +350,24 @@ def test_duplicate_display_name_cannot_hide_an_omitted_person(tmp_path):
     (out_dir / "scoreboard.md").write_text("1. Sam (Driver): 90/100\n2. Stranger (Planner): 70/100\n")
     results = {r.name: r for r in check_outputs(profiles_dir, out_dir, facts)}
     assert not results["scoreboard_complete"].passed
+
+
+def test_scoreboard_title_and_note_lines_are_ignored(valid_outputs):
+    (valid_outputs[1] / "scoreboard.md").write_text(
+        "*Crew Readiness Board: Round 1*\n\n"
+        "1. Jules (Driver): 90/100\n2. Sam (Planner): 70/100\n\n"
+        "_Updated after round 1_\n"
+    )
+    assert all(result.passed for result in check_outputs(*valid_outputs))
+
+
+def test_scoreboard_with_only_a_title_still_fails_completeness(valid_outputs):
+    (valid_outputs[1] / "scoreboard.md").write_text("*Crew Readiness Board: Round 1*\n")
+    assert not results_by_name(valid_outputs)["scoreboard_complete"].passed
+
+
+def test_a_numbered_line_in_the_wrong_format_is_still_reported(valid_outputs):
+    (valid_outputs[1] / "scoreboard.md").write_text(
+        "*Crew Readiness Board: Round 1*\n1. Jules (Driver): 90/100\n2. Sam - 70\n"
+    )
+    assert not results_by_name(valid_outputs)["scoreboard_format"].passed

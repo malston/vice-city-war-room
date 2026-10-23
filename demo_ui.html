@@ -215,7 +215,7 @@ async function refresh() {
 async function showLiveOutput() {
   try {
     const d = await (await fetch("/api/output")).json();
-    if (d.running && d.text) {
+    if (d.text) {
       out.textContent = d.text;
       out.scrollTop = out.scrollHeight;
     }
@@ -225,8 +225,6 @@ async function showLiveOutput() {
 async function step(name, btn, body = {}) {
   btn.disabled = true;
   out.textContent = "Running...";
-  const poll = setInterval(refresh, 1000);   // watch replies arrive during long steps
-  const outPoll = setInterval(showLiveOutput, 500);   // watch command output arrive
   try {
     const r = await fetch("/api/step/" + name, { method: "POST", body: JSON.stringify(body) });
     const d = await r.json();
@@ -238,8 +236,6 @@ async function step(name, btn, body = {}) {
   } catch (e) {
     out.textContent = String(e);
   } finally {
-    clearInterval(poll);
-    clearInterval(outPoll);
     btn.disabled = false;
     refresh();
   }
@@ -249,6 +245,11 @@ document.querySelectorAll("button[data-step]").forEach((b) =>
   b.addEventListener("click", () => step(b.dataset.step, b)));
 $("#reply").addEventListener("click", (e) =>
   step("reply", e.target, { handle: $("#handle").value.trim(), text: $("#text").value }));
+
+// Always watch the channel and the server's command output, so a reloaded or stale tab still
+// shows replies arriving and a running step.
+setInterval(refresh, 1000);
+setInterval(showLiveOutput, 500);
 
 const crab = $("#crab");
 let crabAt = "", crabX = 0, crabY = 0, babies = [];

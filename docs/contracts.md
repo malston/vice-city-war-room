@@ -47,6 +47,8 @@ One line per person, sorted by score descending, ranks 1 to N, scores 0-100:
 
 `<rank>. <display_name> (<codename>): <score>/100`
 
+A title line and blank lines are allowed. Lines that do not start with a number and a period are ignored by the checks and by `movers.py`. Any line that does start with one must follow the format above.
+
 ## Skills
 
 Directory names under `skills/`, each with a `SKILL.md` that has `name` and `description` frontmatter:

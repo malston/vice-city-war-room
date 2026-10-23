@@ -29,13 +29,10 @@ Keep each post under about 200 words. For anyone behind, the closing "next move"
 ## Scoreboard: `scoreboard.md`
 
 ```text
-*Crew Readiness Board: Round <N>*
-
 1. <display_name> (<codename>): <score>/100
 2. <display_name> (<codename>): <score>/100
-
-<one closing line from the Mastermind>
-_React to the job plan you like best._
 ```
+
+`scoreboard.md` holds the ranked lines and nothing else: no title, no closing line, no reaction line, no blank-line commentary. `docs/contracts.md` defines the file that way and `check_outputs.py` enforces it. Any framing for the channel post is added when the post is made, not in this file.
 
 The ranked lines follow `readiness-scoring` exactly. Nothing else on those lines.

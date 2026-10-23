@@ -92,3 +92,11 @@ def test_facts_file_contains_the_six_faq_facts(expected):
 )
 def test_voice_skill_states_the_joke_rules(phrase):
     assert phrase in read_skill("heist-voice").lower()
+
+
+def test_facts_support_the_suggested_time_off_dates():
+    from war_room.checks import unsupported_claims
+
+    plan = "Request time off for Nov 19 and Nov 20."
+
+    assert unsupported_claims(plan, [FACTS_PATH.read_text()]) == set()
