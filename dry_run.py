@@ -95,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
         results = run_checks(args.profiles, args.out, args.facts, args.bait)
     except FileNotFoundError as exc:
         raise SystemExit(f"Missing required path: {exc.filename}") from exc
+    except ValueError as exc:
+        results = [CheckResult("input_format", False, str(exc))]
 
     print("\n=== DRY RUN REPORT ===")
     print(format_report(results))

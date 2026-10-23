@@ -10,8 +10,13 @@ from pathlib import Path
 
 
 SCOREBOARD_RE = re.compile(r"^(\d+)\. (.+) \((.+)\): (\d{1,3})/100$")
-HEADING_RE = re.compile(r"^#{1,6}\s", re.MULTILINE)
-DOLLAR_RE = re.compile(r"\$\d+(?:,\d{3})*(?:\.\d+)?")
+HEADING_RE = re.compile(r"^ {0,3}#{1,6}\s", re.MULTILINE)
+DOLLAR_RE = re.compile(r"\$(\d+(?:,\d{3})*(?:\.\d+)?)([kmb]?)", re.IGNORECASE)
+DOLLAR_SCALES = {"": 1, "k": 1000, "m": 1000000, "b": 1000000000}
+PROFILE_KEYS = (
+    "handle", "display_name", "console", "pto_status", "spouse_risk",
+    "preordered", "weakness", "raw_reply",
+)
 MONTHS = (
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
@@ -31,9 +36,13 @@ class CheckResult:
     detail: str
 
 
+def _dollar_value(match: re.Match[str]) -> Decimal:
+    return Decimal(match[1].replace(",", "")) * DOLLAR_SCALES[match[2].lower()]
+
+
 def unsupported_claims(output_text: str, allowed_texts: list[str]) -> set[str]:
     allowed_dollars = {
-        Decimal(match.group()[1:].replace(",", ""))
+        _dollar_value(match)
         for text in allowed_texts for match in DOLLAR_RE.finditer(text)
     }
     allowed_dates = {
@@ -42,7 +51,7 @@ def unsupported_claims(output_text: str, allowed_texts: list[str]) -> set[str]:
     }
     unsupported = {
         match.group() for match in DOLLAR_RE.finditer(output_text)
-        if Decimal(match.group()[1:].replace(",", "")) not in allowed_dollars
+        if _dollar_value(match) not in allowed_dollars
     }
     unsupported.update(
         match.group() for match in DATE_RE.finditer(output_text)
@@ -51,19 +60,41 @@ def unsupported_claims(output_text: str, allowed_texts: list[str]) -> set[str]:
     return unsupported
 
 
+def _read_utf8(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{path}: invalid UTF-8: {exc.reason}") from exc
+
+
+def _load_profile(path: Path) -> dict:
+    try:
+        profile = json.loads(_read_utf8(path))
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"{path}: invalid JSON: {exc.msg} (line {exc.lineno}, column {exc.colno})"
+        ) from exc
+    if not isinstance(profile, dict):
+        raise ValueError(f"{path}: expected a JSON object")
+    for key in PROFILE_KEYS:
+        if key not in profile:
+            raise ValueError(f"{path}: missing contract key: {key}")
+    return profile
+
+
 def check_outputs(profiles_dir: Path, out_dir: Path, facts_path: Path) -> list[CheckResult]:
     for path in (profiles_dir, out_dir, facts_path):
         if not path.exists():
             raise FileNotFoundError(errno.ENOENT, "Missing required path", str(path))
 
     profiles = [
-        json.loads(path.read_text(encoding="utf-8"))
+        _load_profile(path)
         for path in sorted(profiles_dir.glob("*.json"))
     ]
     person_paths = [out_dir / f"{profile['handle']}.md" for profile in profiles]
     scoreboard = out_dir / "scoreboard.md"
     texts = {
-        path.name: path.read_text(encoding="utf-8")
+        path.name: _read_utf8(path)
         for path in sorted(set(person_paths + [scoreboard])) if path.is_file()
     }
     failures = {
@@ -109,7 +140,7 @@ def check_outputs(profiles_dir: Path, out_dir: Path, facts_path: Path) -> list[C
             f"scoreboard.md: {len(lines)} lines for {len(profiles)} profiles"
         )
 
-    allowed_texts = [facts_path.read_text(encoding="utf-8")]
+    allowed_texts = [_read_utf8(facts_path)]
     allowed_texts.extend(profile["raw_reply"] for profile in profiles)
     for filename, text in texts.items():
         if "\u2014" in text:

@@ -109,6 +109,12 @@ def test_hash_heading_fails(valid_outputs, prefix):
     assert not results_by_name(valid_outputs)["slack_formatting"].passed
 
 
+@pytest.mark.parametrize("indent", [" ", "  ", "   "])
+def test_indented_hash_heading_fails(valid_outputs, indent):
+    (valid_outputs[1] / "sam.md").write_text(f"Ready\n{indent}# Plan\n")
+    assert not results_by_name(valid_outputs)["slack_formatting"].passed
+
+
 def test_hashtag_at_line_start_is_not_a_heading(valid_outputs):
     (valid_outputs[1] / "sam.md").write_text("#nospoilers is the rule\n")
     assert results_by_name(valid_outputs)["slack_formatting"].passed
@@ -142,6 +148,31 @@ def test_claims_compare_values_and_preserve_unsupported_spelling():
     assert unsupported_claims(
         "$70.00 $1,000 $69.99 Nov. 20th December 2nd", ["$70 $1000.00 Nov 19 Dec 2"]
     ) == {"$69.99", "Nov. 20th"}
+
+
+@pytest.mark.parametrize("suffix,amount", [
+    ("k", "$1,500"), ("K", "$1,500"),
+    ("m", "$1,500,000"), ("M", "$1,500,000"),
+    ("b", "$1,500,000,000"), ("B", "$1,500,000,000"),
+])
+def test_dollar_scale_suffixes_compare_values(suffix, amount):
+    scaled = f"$1.5{suffix}"
+    assert unsupported_claims(scaled, [amount]) == set()
+    assert unsupported_claims(amount, [scaled]) == set()
+    assert unsupported_claims(scaled, ["$1.5"]) == {scaled}
+
+
+@pytest.mark.parametrize("claim,allowed,expected", [
+    ("$70k", "$70", {"$70k"}),
+    ("$70", "$70k", {"$70"}),
+    ("$70,000", "$70k", set()),
+    ("$70k", "$70,000", set()),
+    ("$70 k", "$70", set()),
+    ("$70 k", "$70,000", {"$70"}),
+    ("$70,000", "$70 k", {"$70,000"}),
+])
+def test_dollar_scale_requires_an_adjacent_suffix(claim, allowed, expected):
+    assert unsupported_claims(claim, [allowed]) == expected
 
 
 @pytest.mark.parametrize("month", [
@@ -252,6 +283,57 @@ def test_main_returns_zero_on_valid_outputs_and_one_for_missing_file(valid_outpu
     (out / "sam.md").unlink()
     assert main(args) == 1
     assert "FAIL person_files: sam.md\n" in capsys.readouterr().out
+
+
+def assert_invalid_input_reported(paths, path, reason, capsys):
+    profiles, out, facts = paths
+    assert main([
+        "--profiles", str(profiles), "--out", str(out), "--facts", str(facts),
+    ]) == 1
+    captured = capsys.readouterr()
+    report = captured.err or captured.out
+    assert len(report.splitlines()) == 1
+    assert str(path) in report
+    assert reason in report
+    assert captured.err or report.startswith("FAIL ")
+    with pytest.raises(ValueError) as exc_info:
+        check_outputs(*paths)
+    assert str(path) in str(exc_info.value)
+    assert reason in str(exc_info.value)
+
+
+@pytest.mark.parametrize("content,reason", [
+    ('{\n"handle": }', "JSON"),
+    ("[]", "object"), ("null", "object"), ('"sam"', "object"),
+    ("42", "object"), ("true", "object"),
+])
+def test_malformed_profile_is_reported(valid_outputs, capsys, content, reason):
+    path = valid_outputs[0] / "sam.json"
+    path.write_text(content, encoding="utf-8")
+    assert_invalid_input_reported(valid_outputs, path, reason, capsys)
+
+
+@pytest.mark.parametrize("key", [
+    "handle", "display_name", "console", "pto_status", "spouse_risk",
+    "preordered", "weakness", "raw_reply",
+])
+def test_missing_profile_contract_key_is_reported(valid_outputs, capsys, key):
+    path = valid_outputs[0] / "sam.json"
+    profile = json.loads(path.read_text(encoding="utf-8"))
+    del profile[key]
+    path.write_text(json.dumps(profile), encoding="utf-8")
+    assert_invalid_input_reported(valid_outputs, path, f"missing contract key: {key}", capsys)
+
+
+@pytest.mark.parametrize("index,filename", [
+    (0, "sam.json"), (1, "sam.md"), (1, "scoreboard.md"), (2, None),
+])
+def test_invalid_utf8_is_reported(valid_outputs, capsys, index, filename):
+    path = valid_outputs[index]
+    if filename is not None:
+        path = path / filename
+    path.write_bytes(b"\xff")
+    assert_invalid_input_reported(valid_outputs, path, "UTF-8", capsys)
 
 
 def test_duplicate_display_name_cannot_hide_an_omitted_person(tmp_path):

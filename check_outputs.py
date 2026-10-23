@@ -8,7 +8,7 @@ Usage:
 import argparse
 from pathlib import Path
 
-from war_room.checks import check_outputs, format_report
+from war_room.checks import CheckResult, check_outputs, format_report
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -21,6 +21,9 @@ def main(argv: list[str] | None = None) -> int:
         results = check_outputs(args.profiles, args.out, args.facts)
     except FileNotFoundError as exc:
         raise SystemExit(f"Missing required path: {exc.filename}") from exc
+    except ValueError as exc:
+        print(format_report([CheckResult("input_format", False, str(exc))]))
+        return 1
     print(format_report(results))
     return 1 if any(not result.passed for result in results) else 0
 
