@@ -1,6 +1,7 @@
 import json
+from types import SimpleNamespace
 
-from upload_skills import SKILL_TO_AGENTS, load_agent_ids
+from upload_skills import SKILL_TO_AGENTS, load_agent_ids, skill_dicts, skills_by_title
 
 CONTRACT_SKILLS = {
     "pto-playbook",
@@ -38,6 +39,33 @@ def test_load_agent_ids_without_coordinator_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".specialist_ids.json").write_text(json.dumps({"fixer": "agent_f"}))
     assert load_agent_ids() == {"fixer": "agent_f"}
+
+
+def test_skills_by_title_reads_display_name():
+    skills = [
+        SimpleNamespace(id="skill_1", display_name="Heist Voice"),
+        SimpleNamespace(id="skill_2", display_name="Pto Playbook"),
+    ]
+    assert skills_by_title(skills) == {
+        "Heist Voice": "skill_1",
+        "Pto Playbook": "skill_2",
+    }
+
+
+class FakeSkill:
+    """Stands in for the SDK's typed skill object."""
+
+    def model_dump(self):
+        return {"skill_id": "skill_1", "type": "custom", "version": "latest"}
+
+
+def test_skill_dicts_converts_typed_objects_and_keeps_dicts():
+    plain = {"skill_id": "skill_2", "type": "custom", "version": "latest"}
+    assert skill_dicts([FakeSkill(), plain]) == [FakeSkill().model_dump(), plain]
+
+
+def test_skill_dicts_handles_none():
+    assert skill_dicts(None) == []
 
 
 def test_skill_map_covers_the_seven_contract_skills():
