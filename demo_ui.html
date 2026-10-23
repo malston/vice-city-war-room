@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vice City War Room</title>
+<style>
+  /* Palette: ocean-at-night, flamingo, pool, stucco, sunset. System fonts only (works offline). */
+  :root {
+    --ocean: #1c1747;
+    --ocean-deep: #130f33;
+    --flamingo: #ff5c93;
+    --pool: #3fe0cf;
+    --stucco: #f7e6c8;
+    --sunset: #ff9340;
+    --ok: #7be495;
+    --bad: #ff6b6b;
+    --display: "Arial Black", "Helvetica Neue", Impact, sans-serif;
+    --body: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    --mono: Consolas, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 var(--body); background: var(--ocean); color: var(--stucco); }
+  :focus-visible { outline: 3px solid var(--pool); outline-offset: 2px; }
+
+  /* Hero: the striped sunset is the one memorable thing; everything else stays quiet. */
+  header {
+    position: relative; overflow: hidden; padding: 36px 32px 28px;
+    background: linear-gradient(180deg, var(--ocean-deep) 0%, #3a1c5e 70%, #8a2d6b 100%);
+    border-bottom: 4px solid var(--flamingo);
+  }
+  header::before {
+    content: ""; position: absolute; right: 6%; bottom: -70px; width: 260px; height: 260px; border-radius: 50%;
+    background: linear-gradient(180deg, var(--sunset), var(--flamingo));
+    -webkit-mask: repeating-linear-gradient(180deg, #000 0 14px, transparent 14px 18px);
+            mask: repeating-linear-gradient(180deg, #000 0 14px, transparent 14px 18px);
+  }
+  h1 {
+    position: relative; margin: 0; font: italic 900 clamp(34px, 6vw, 64px)/0.95 var(--display);
+    letter-spacing: -0.02em; color: var(--stucco); text-shadow: 3px 3px 0 var(--flamingo);
+  }
+  header p { position: relative; margin: 10px 0 0; max-width: 46ch; color: var(--stucco); opacity: .85; }
+
+  main { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 28px; padding: 28px 32px 40px; }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; padding: 20px 16px 32px; } header { padding: 28px 16px 22px; } }
+
+  h2 { margin: 0 0 10px; font: 700 18px/1.2 var(--display); color: var(--pool); }
+  .panel { margin-bottom: 28px; }
+
+  /* Steps: a real sequence, so numbered markers are earned. */
+  ol { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+  li { counter-increment: s; margin: 0 0 8px; }
+  button {
+    font: inherit; color: inherit; cursor: pointer; text-align: left;
+    transition: background .15s, border-color .15s;
+  }
+  .step {
+    display: grid; grid-template-columns: 34px 1fr; column-gap: 12px; align-items: center; width: 100%;
+    padding: 10px 14px; background: var(--ocean-deep); border: 2px solid #3b3274; border-radius: 4px 14px 4px 14px;
+  }
+  .step::before {
+    content: counter(s); grid-row: span 2; width: 34px; height: 34px; display: grid; place-items: center;
+    border-radius: 50%; background: var(--flamingo); color: var(--ocean-deep); font: 900 16px var(--display);
+  }
+  .step:hover:enabled { border-color: var(--pool); background: #221b57; }
+  .step:disabled { opacity: .55; cursor: wait; }
+  .step.done { border-color: var(--ok); }
+  .step.done::before { content: "\2713"; background: var(--ok); }
+  .step.fail { border-color: var(--bad); }
+  .step.fail::before { content: "!"; background: var(--bad); }
+  .step b { font-weight: 700; }
+  .step small { grid-column: 2; opacity: .7; }
+
+  label { display: block; margin: 8px 0 2px; font-size: 14px; opacity: .85; }
+  input {
+    width: 100%; padding: 8px 10px; font: inherit; color: var(--ocean-deep);
+    background: var(--stucco); border: 2px solid transparent; border-radius: 4px;
+  }
+  .send {
+    width: 100%; margin-top: 10px; padding: 10px 14px; font-weight: 700; text-align: center;
+    background: var(--pool); color: var(--ocean-deep); border: 0; border-radius: 4px 14px 4px 14px;
+  }
+  .send:hover:enabled { background: var(--stucco); }
+  .send:disabled { opacity: .55; cursor: wait; }
+
+  /* Channel reads like a chat; output is real terminal text, so mono is earned there. */
+  #channel { height: 360px; overflow: auto; padding: 14px; background: var(--ocean-deep); border-radius: 6px; border-left: 4px solid var(--flamingo); }
+  #channel:empty::before { content: "No messages yet. Start with step 1, then post the kickoff."; opacity: .6; }
+  .msg { margin: 0 0 12px; white-space: pre-wrap; max-width: 70ch; }
+  .msg b { color: var(--sunset); }
+  .msg.bot { padding-left: 10px; border-left: 3px solid var(--pool); }
+  .msg.bot b { color: var(--pool); }
+  .msg i { opacity: .55; font-style: normal; font-size: 13px; }
+
+  pre {
+    margin: 0; height: 220px; overflow: auto; padding: 12px; font: 13px/1.5 var(--mono); color: var(--pool);
+    background: #0b0924; border-radius: 6px; white-space: pre-wrap;
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Vice City War Room</h1>
+  <p>Friends reply to one kickoff post. The swarm turns each reply into a launch-day plan.</p>
+</header>
+<main>
+  <div>
+    <div class="panel">
+      <h2>Run the demo</h2>
+      <ol>
+        <li><button class="step" data-step="reset"><b>Start clean</b><small>Clear the channel</small></button></li>
+        <li><button class="step" data-step="kickoff"><b>Post the kickoff</b><small>Saves the kickoff timestamp</small></button></li>
+        <li><button class="step" data-step="seed"><b>Friends reply</b><small>Five fictional people, one per second</small></button></li>
+        <li><button class="step" data-step="profiles"><b>Replies become profiles</b><small>Reads the channel and parses each reply</small></button></li>
+        <li><button class="step" data-step="swarm"><b>Run the swarm and check</b><small>Needs ANTHROPIC_API_KEY and agents set up</small></button></li>
+        <li><button class="step" data-step="post"><b>Post the plans</b><small>Each plan, then the scoreboard</small></button></li>
+      </ol>
+    </div>
+    <div class="panel">
+      <h2>Reply by hand</h2>
+      <label for="handle">Handle</label>
+      <input id="handle" placeholder="mara" autocomplete="off">
+      <label for="text">Reply</label>
+      <input id="text" placeholder="Console: PS5" autocomplete="off">
+      <button class="send" id="reply">Send reply</button>
+    </div>
+  </div>
+  <div>
+    <div class="panel"><h2>Channel</h2><div id="channel" aria-live="polite"></div></div>
+    <div class="panel"><h2>Command output</h2><pre id="out">Ready.</pre></div>
+  </div>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const out = $("#out");
+
+async function refresh() {
+  const r = await fetch("/api/channel");
+  const d = await r.json();
+  if (d.error) { $("#channel").textContent = d.error; return; }
+  const box = $("#channel");
+  box.replaceChildren(...d.messages.map((m) => {
+    const el = document.createElement("div");
+    el.className = "msg" + (m.handle === "war-room" ? " bot" : "");
+    const who = document.createElement("b"); who.textContent = m.name;
+    const t = document.createElement("i"); t.textContent = " " + m.line + "\n";
+    el.append(who, t, m.text);   // textContent only, no HTML injection
+    return el;
+  }));
+  box.scrollTop = box.scrollHeight;
+}
+
+async function step(name, btn, body = {}) {
+  btn.disabled = true;
+  out.textContent = "Running...";
+  const poll = setInterval(refresh, 1000);   // watch replies arrive during long steps
+  try {
+    const r = await fetch("/api/step/" + name, { method: "POST", body: JSON.stringify(body) });
+    const d = await r.json();
+    out.textContent = d.output;
+    btn.classList.remove("done", "fail");
+    btn.classList.add(d.ok ? "done" : "fail");
+  } catch (e) {
+    out.textContent = String(e);
+  } finally {
+    clearInterval(poll);
+    btn.disabled = false;
+    refresh();
+  }
+}
+
+document.querySelectorAll("button[data-step]").forEach((b) =>
+  b.addEventListener("click", () => step(b.dataset.step, b)));
+$("#reply").addEventListener("click", (e) =>
+  step("reply", e.target, { handle: $("#handle").value.trim(), text: $("#text").value }));
+refresh();
+</script>
+</body>
+</html>
