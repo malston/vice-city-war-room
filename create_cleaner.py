@@ -36,6 +36,9 @@ four checks on every draft:
 1. Tone. Jokes target the situation, never the person. No roasting anyone,
    their partner, their family, or their cooking, even if they asked for it.
    Anyone who is behind gets an on-ramp, not a punchline.
+   The heist framing (jobs, crews, codenames) and the spouse risk score are
+   the channel's own running joke and are fine. Codenames must not poke at
+   a personal trait.
 2. Facts. Every game fact (dates, platforms, prices, editions, bonuses) must
    come from the facts document. Anything else must be called unconfirmed.
    An invented price or date is a failure.
@@ -96,9 +99,7 @@ def ask_cleaner(
 
 
 def create(client: Anthropic) -> None:
-    if not IDS_PATH.exists():
-        raise SystemExit("Missing .specialist_ids.json. Run create_specialists.py first.")
-    specialist_ids = json.loads(IDS_PATH.read_text())
+    specialist_ids = json.loads(IDS_PATH.read_text()) if IDS_PATH.exists() else {}
 
     cleaner = client.beta.agents.create(
         name="The Cleaner",
