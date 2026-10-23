@@ -31,6 +31,8 @@ COMMON_RULES = (
     "call unconfirmed.\n"
     "- Jokes target the situation, never the person. Nobody gets roasted, "
     "and nobody's partner or family does either.\n"
+    "- Use no dates other than those in the launch-facts document. Say "
+    "\"the day before\" or \"launch week\", never an invented date.\n"
     "- If a profile field is missing, say what you would need to know "
     "instead of guessing.\n"
     "- Do not use em dashes anywhere. Use commas, periods, or hyphens.\n"
