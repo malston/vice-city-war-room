@@ -34,6 +34,10 @@ Written to `outputs/round-N/`:
 - `<handle>.md`: one per profile
 - `scoreboard.md`
 - `coordinator-transcript.txt`
+- `movers.md`: written by `movers.py` for rounds 2 and 3 (slice 5)
+- `post-queue.json`: written by `post_queue.py` (slice 5)
+
+Other slices ignore `movers.md` and `post-queue.json`.
 
 Slack formatting: `*bold*`, no `**`, no `#` headings. No em dashes.
 
