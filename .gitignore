@@ -1,6 +1,6 @@
 .env
-profiles/
-outputs/
+/profiles/
+/outputs/
 .specialist_ids.json
 .coordinator_id
 .environment_id
