@@ -1,6 +1,6 @@
 # Demo: running a round with the fake channel
 
-This walk-through needs no Slack connection. The replies come from fictional people, and the plans are posted into a channel kept in `outputs/demo/channel.json`. The swarm itself still needs `ANTHROPIC_API_KEY` and the agents from the setup order in [`contracts.md`](contracts.md).
+This walk-through needs no Slack connection. The replies come from fictional people, and the plans are posted into a channel kept in `outputs/demo/channel.json`. The swarm step (step 6) needs three things: `ANTHROPIC_API_KEY` exported in your shell (nothing loads `.env`), the agents from the setup order in [`contracts.md`](contracts.md), and a passing `python dry_run.py`. There is also a browser version of the same steps, described near the end.
 
 In the real flow your Claude session reads and posts through Slack. Here the same three steps are `fake_slack.py` commands: save the replies, post the kickoff, and post the plans.
 
@@ -42,7 +42,7 @@ In the real flow your Claude session reads and posts through Slack. Here the sam
    python parse_profiles.py --messages outputs/messages.json --kickoff-ts $KICKOFF_TS
    ```
 
-6. **Run the swarm and check the output.**
+6. **Run the swarm and check the output.** Run `python dry_run.py` once beforehand. It runs the crew on fictional people and checks the result.
 
    ```text
    python run_war_room.py --round 1 --profiles profiles
@@ -60,6 +60,31 @@ In the real flow your Claude session reads and posts through Slack. Here the sam
 ## Round 2
 
 Have people reply with changes (`reply --as otto --text "Preordered: yes"`). Run steps 4 to 7 again with the same `$KICKOFF_TS`, so everyone's earlier answers carry over, and add `--prior-scoreboard outputs/round-1/scoreboard.md` to the swarm command with `--round 2`.
+
+## Browser version
+
+```text
+python demo_ui.py
+```
+
+Open `http://127.0.0.1:8765`. The page binds to your own machine only, and each button runs the same commands as the walk-through with fixed arguments.
+
+| Button                     | Runs                                                                                   |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| 1. Start clean             | `fake_slack.py reset`                                                                  |
+| 2. Post the kickoff        | `fake_slack.py post --file docs/kickoff-post.md --fenced`, and remembers the timestamp |
+| 3. Friends reply           | `fake_slack.py seed --delay 1`, one reply per second                                   |
+| 4. Replies become profiles | `fake_slack.py read` then `parse_profiles.py`                                          |
+| 5. Run the swarm and check | `run_war_room.py --round 1` then `check_outputs.py`                                    |
+| 6. Post the plans          | `fake_slack.py post` for every plan in `outputs/round-1`, then the scoreboard          |
+
+The Channel panel updates as messages arrive, and the Command output panel shows what the last button printed. "Reply by hand" posts one message as a teammate; it needs a valid handle (lowercase letters, digits, `_` or `-`) and some text.
+
+Things to know:
+
+- Button 5 needs `ANTHROPIC_API_KEY` exported in the shell where you started `demo_ui.py`, plus the agents from the setup order.
+- Button 6 posts every plan with no approval step. Use the terminal `post` command when you want to post only some.
+- The page remembers the kickoff timestamp in memory. If you restart `demo_ui.py`, click "Start clean" and post the kickoff again.
 
 ## Commands
 
