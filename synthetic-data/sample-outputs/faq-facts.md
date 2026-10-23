@@ -1,0 +1,6 @@
+- Release date: November 19, 2026 (source: channel launch FAQ)
+- Platforms at launch: PlayStation 5 and Xbox Series X|S; no PC date announced (source: channel launch FAQ)
+- Pre-orders opened June 25, 2026 (source: channel launch FAQ)
+- Digital editions: PlayStation Store and Microsoft Store (source: channel launch FAQ)
+- Price, special editions, and pre-order bonuses: UNCONFIRMED as of August (source: channel launch FAQ)
+- Thanksgiving is one week after launch (source: channel launch FAQ)
