@@ -25,13 +25,44 @@ ROUND_DIR = Path("outputs/round-1")
 PY = sys.executable
 state = {"kickoff_ts": None}  # ponytail: one in-memory demo session, single presenter
 lock = threading.Lock()
+STEP_TIMEOUT = 900
+live = {"text": "", "running": False}  # output of the step in progress, served at /api/output
+live_lock = threading.Lock()
+
+
+def emit(text: str) -> None:
+    with live_lock:
+        live["text"] += text
 
 
 def run(*cmd: str) -> tuple[int, str]:
-    p = subprocess.run(
-        [PY, *cmd], cwd=ROOT, capture_output=True, text=True, timeout=900
+    header = f"$ {' '.join(cmd)}\n"
+    emit(header)
+    p = subprocess.Popen(
+        [PY, "-u", *cmd], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
     )
-    return p.returncode, f"$ {' '.join(cmd)}\n{p.stdout}{p.stderr}"
+    timed_out = threading.Event()
+
+    def kill() -> None:
+        timed_out.set()
+        p.kill()
+
+    timer = threading.Timer(STEP_TIMEOUT, kill)
+    timer.start()
+    lines = []
+    try:
+        for line in p.stdout:
+            lines.append(line)
+            emit(line)
+        code = p.wait()
+    finally:
+        timer.cancel()
+    if timed_out.is_set():
+        note = f"(timed out after {STEP_TIMEOUT} s)\n"
+        lines.append(note)
+        emit(note)
+        code = code or 1
+    return code, header + "".join(lines)
 
 
 def sequence(*cmds: tuple[str, ...]) -> tuple[bool, str]:
@@ -115,6 +146,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path == "/":
             self.send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
+        elif self.path == "/api/output":
+            with live_lock:
+                self.json(200, dict(live))
         elif self.path == "/api/channel":
             try:
                 msgs = load_channel(ROOT / DEFAULT_CHANNEL)
@@ -140,7 +174,13 @@ class Handler(BaseHTTPRequestHandler):
             size = min(int(self.headers.get("Content-Length") or 0), 10_000)
             body = json.loads(self.rfile.read(size) or b"{}")
             with lock:  # one step at a time
-                ok, out = step(body if isinstance(body, dict) else {})
+                with live_lock:
+                    live.update(text="", running=True)
+                try:
+                    ok, out = step(body if isinstance(body, dict) else {})
+                finally:
+                    with live_lock:
+                        live["running"] = False
         except (ValueError, subprocess.TimeoutExpired) as e:
             return self.json(400, {"ok": False, "output": str(e)})
         self.json(200, {"ok": ok, "output": out})
