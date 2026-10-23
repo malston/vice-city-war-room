@@ -17,6 +17,7 @@ INTAKE_FIELDS = ("console", "pto_status", "spouse_risk", "preordered", "weakness
 LABEL_ALIASES = {
     "console": "console",
     "pto": "pto_status",
+    "pto status": "pto_status",
     "time off": "pto_status",
     "spouse risk": "spouse_risk",
     "spouse": "spouse_risk",
@@ -24,7 +25,10 @@ LABEL_ALIASES = {
     "preordered": "preordered",
     "pre-ordered": "preordered",
     "pre-order": "preordered",
+    "preorder": "preordered",
+    "pre order": "preordered",
     "weakness": "weakness",
+    "biggest weakness": "weakness",
 }
 
 # Skips bullets, quote marks, and Slack bold around the label.

@@ -2,7 +2,13 @@ import json
 
 import pytest
 
-from war_room.profiles import HANDLE_RE, Profile, parse_replies, write_profiles
+from war_room.profiles import (
+    HANDLE_RE,
+    LABEL_ALIASES,
+    Profile,
+    parse_replies,
+    write_profiles,
+)
 
 CONTRACT_KEYS = {
     "handle",
@@ -106,6 +112,49 @@ def test_second_reply_updates_only_fields_it_gives():
     assert profile.console == "PS5"
     assert profile.preordered is True
     assert profile.raw_reply == "Console: PS5\nPreordered: no\n---\nPreordered: yes"
+
+
+def test_second_reply_with_blank_labels_does_not_blank_earlier_fields():
+    messages = [
+        msg("jules", "Console: PS5\nPreordered: no", ts="200.0"),
+        msg("jules", "Console:\nPreordered: yes", ts="300.0"),
+    ]
+
+    (profile,) = parse_replies(messages, KICKOFF_TS)
+
+    assert profile.console == "PS5"
+    assert profile.preordered is True
+
+
+SAMPLE_VALUES = {
+    "console": ("PS5", "PS5"),
+    "pto_status": ("approved", "approved"),
+    "spouse_risk": ("3", 3),
+    "preordered": ("yes", True),
+    "weakness": ("snacks", "snacks"),
+}
+
+
+@pytest.mark.parametrize("alias, field", sorted(LABEL_ALIASES.items()))
+def test_every_label_alias_fills_its_field(alias, field):
+    value, expected = SAMPLE_VALUES[field]
+
+    assert getattr(parse_one(f"{alias}: {value}"), field) == expected
+
+
+@pytest.mark.parametrize(
+    "label, field",
+    [
+        ("PTO status", "pto_status"),
+        ("Biggest weakness", "weakness"),
+        ("Preorder", "preordered"),
+        ("Pre order", "preordered"),
+    ],
+)
+def test_field_names_from_the_spec_are_recognized(label, field):
+    value, expected = SAMPLE_VALUES[field]
+
+    assert getattr(parse_one(f"{label}: {value}"), field) == expected
 
 
 def test_replies_are_merged_in_timestamp_order_not_list_order():
