@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vice City War Room: Demo</title>
+<style>
+  body { font: 16px system-ui, sans-serif; margin: 0; background: #1a1026; color: #f5eefc; }
+  header { padding: 14px 24px; background: linear-gradient(90deg, #ff3d9a, #ff9a3d); color: #1a1026; }
+  h1 { margin: 0; font-size: 22px; }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px 24px; }
+  section { background: #2a1b3d; border-radius: 8px; padding: 12px; }
+  h2 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; color: #ff9a3d; }
+  button { display: block; width: 100%; margin: 6px 0; padding: 10px; font-size: 15px; text-align: left;
+           border: 0; border-radius: 6px; background: #4b2f6b; color: inherit; cursor: pointer; }
+  button:hover:enabled { background: #6a4096; }
+  button:disabled { opacity: .5; cursor: wait; }
+  button.done { border-left: 6px solid #4cd964; }
+  button.fail { border-left: 6px solid #ff453a; }
+  small { display: block; opacity: .7; }
+  input { width: 100%; box-sizing: border-box; padding: 6px; margin: 3px 0; border-radius: 4px; border: 0; }
+  #channel { height: 340px; overflow: auto; }
+  .msg { margin: 6px 0; white-space: pre-wrap; }
+  .msg b { color: #ff9a3d; } .msg.bot b { color: #4cd9c4; } .msg i { opacity: .6; font-style: normal; }
+  pre { margin: 0; height: 200px; overflow: auto; font-size: 13px; background: #120a1c; padding: 8px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<header><h1>Vice City War Room: Demo</h1></header>
+<main>
+  <section>
+    <h2>Steps</h2>
+    <button data-step="reset">1. Start clean<small>Clear the channel</small></button>
+    <button data-step="kickoff">2. Post the kickoff<small>Saves the kickoff timestamp</small></button>
+    <button data-step="seed">3. Friends reply<small>Five fictional people, one per second</small></button>
+    <button data-step="profiles">4. Replies become profiles<small>read + parse_profiles</small></button>
+    <button data-step="swarm">5. Run the swarm and check<small>Needs ANTHROPIC_API_KEY and agents set up</small></button>
+    <button data-step="post">6. Post the plans<small>Each plan, then the scoreboard</small></button>
+    <h2 style="margin-top:14px">Reply by hand</h2>
+    <input id="handle" placeholder="handle (e.g. mara)">
+    <input id="text" placeholder="Console: PS5">
+    <button id="reply">Send reply</button>
+  </section>
+  <div>
+    <section><h2>Channel</h2><div id="channel"></div></section>
+    <section style="margin-top:16px"><h2>Command output</h2><pre id="out">Ready.</pre></section>
+  </div>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const out = $("#out");
+
+async function refresh() {
+  const r = await fetch("/api/channel");
+  const d = await r.json();
+  if (d.error) { $("#channel").textContent = d.error; return; }
+  const box = $("#channel");
+  box.replaceChildren(...d.messages.map((m) => {
+    const el = document.createElement("div");
+    el.className = "msg" + (m.handle === "war-room" ? " bot" : "");
+    const who = document.createElement("b"); who.textContent = m.name;
+    const t = document.createElement("i"); t.textContent = " " + m.line + "\n";
+    el.append(who, t, m.text);   // textContent only, no HTML injection
+    return el;
+  }));
+  box.scrollTop = box.scrollHeight;
+}
+
+async function step(name, btn, body = {}) {
+  btn.disabled = true;
+  out.textContent = "Running...";
+  const poll = setInterval(refresh, 1000);   // watch replies arrive during long steps
+  try {
+    const r = await fetch("/api/step/" + name, { method: "POST", body: JSON.stringify(body) });
+    const d = await r.json();
+    out.textContent = d.output;
+    btn.classList.remove("done", "fail");
+    btn.classList.add(d.ok ? "done" : "fail");
+  } catch (e) {
+    out.textContent = String(e);
+  } finally {
+    clearInterval(poll);
+    btn.disabled = false;
+    refresh();
+  }
+}
+
+document.querySelectorAll("button[data-step]").forEach((b) =>
+  b.addEventListener("click", () => step(b.dataset.step, b)));
+$("#reply").addEventListener("click", (e) =>
+  step("reply", e.target, { handle: $("#handle").value.trim(), text: $("#text").value }));
+refresh();
+</script>
+</body>
+</html>
