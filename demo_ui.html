@@ -96,7 +96,15 @@
     margin: 0; height: 220px; overflow: auto; padding: 12px; font: 13px/1.5 var(--mono); color: var(--pool);
     background: #0b0924; border-radius: 6px; white-space: pre-wrap;
   }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  /* Clawd in shades: scuttles to whichever button you hover or focus, hops on click. */
+  #crab { position: absolute; left: 0; top: 0; z-index: 10; pointer-events: none; transition: transform .7s ease-in-out; }
+  #crab svg { display: block; overflow: visible; }
+  #crab.walk .a { animation: leg .2s linear infinite; }
+  #crab.walk .b { animation: leg .2s linear infinite -.1s; }
+  #crab.hop svg { animation: hop .35s ease-out; }
+  @keyframes leg { 50%, 100% { transform: translateY(-1px); } }
+  @keyframes hop { 50% { transform: translateY(-12px); } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
@@ -131,6 +139,15 @@
     <div class="panel"><h2>Command output</h2><pre id="out">Ready.</pre></div>
   </div>
 </main>
+<div id="crab" aria-hidden="true"><svg viewBox="0 0 16 12" width="48" height="36" shape-rendering="crispEdges">
+  <g fill="#d97757">
+    <rect x="2" y="2" width="12" height="7"/><rect x="0" y="4" width="2" height="2"/><rect x="14" y="4" width="2" height="2"/>
+    <g class="a"><rect x="3" y="9" width="1" height="3"/><rect x="10" y="9" width="1" height="3"/></g>
+    <g class="b"><rect x="5" y="9" width="1" height="3"/><rect x="12" y="9" width="1" height="3"/></g>
+  </g>
+  <g fill="#111"><rect x="3" y="4" width="10" height="1"/><rect x="4" y="4" width="3" height="2"/><rect x="9" y="4" width="3" height="2"/></g>
+  <g fill="#fff" opacity=".7"><rect x="4" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/></g>
+</svg></div>
 <script>
 const $ = (s) => document.querySelector(s);
 const out = $("#out");
@@ -174,6 +191,27 @@ document.querySelectorAll("button[data-step]").forEach((b) =>
   b.addEventListener("click", () => step(b.dataset.step, b)));
 $("#reply").addEventListener("click", (e) =>
   step("reply", e.target, { handle: $("#handle").value.trim(), text: $("#text").value }));
+
+const crab = $("#crab");
+let crabAt = "";
+function scuttle(btn) {
+  const r = btn.getBoundingClientRect();
+  const to = `translate(${Math.round(r.right + scrollX - 60)}px, ${Math.round(r.top + scrollY - 30)}px)`;
+  if (to === crabAt) return;
+  crabAt = to;
+  crab.classList.add("walk");
+  crab.style.transform = to;
+}
+crab.addEventListener("transitionend", () => crab.classList.remove("walk"));
+document.querySelectorAll("button").forEach((b) => {
+  b.addEventListener("mouseenter", () => scuttle(b));
+  b.addEventListener("focus", () => scuttle(b));
+  b.addEventListener("click", () => {
+    scuttle(b);
+    crab.classList.remove("hop"); void crab.offsetWidth; crab.classList.add("hop");
+  });
+});
+scuttle($(".step"));
 refresh();
 </script>
 </body>
