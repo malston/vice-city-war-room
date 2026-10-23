@@ -1,0 +1,10 @@
+.env
+profiles/
+outputs/
+.specialist_ids.json
+.coordinator_id
+.environment_id
+.last_session_id
+__pycache__/
+.pytest_cache/
+.venv/
