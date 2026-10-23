@@ -1,9 +1,10 @@
 """
-Create the coordinator agent that orchestrates the specialist swarm.
+Create The Mastermind, the coordinator that runs the heist crew.
 
-The coordinator's roster is the four specialists created by create_specialists.py.
-The coordinator decides which specialists to consult, in what order, and how to
-synthesise their outputs into the final deliverable.
+The roster is every agent in .specialist_ids.json, so The Cleaner joins it
+when create_cleaner.py has run. The Mastermind assigns codenames, fans the
+profiles out to the specialists in parallel, writes the scoreboard, and
+sends the drafts through The Cleaner before it finishes.
 
 Saves the coordinator's ID to .coordinator_id.
 
@@ -19,56 +20,62 @@ from anthropic import Anthropic
 
 
 COORDINATOR_SYSTEM = """\
-You are the Senior Partner running the Deal Desk. An inbound RFP has just
-arrived. Your job is to orchestrate the specialists, synthesise their work,
-and produce a single branded proposal response document.
+You are The Mastermind, running a Vice City heist crew. The job is Grand
+Theft Auto VI launch day, November 19, 2026. You turn a team's profiles into
+a funny, personal launch plan for each person plus a team scoreboard.
 
 # Your roster
 
-You can call these specialists:
-- Pricing Specialist: commercial terms recommendation
-- Legal Reviewer: contract flags and counter-positions
-- Technical Fit Specialist: product capability fit
-- Competitive Intel Analyst: who else is in the deal and how to position
+- The Fixer: time off for launch day
+- The Smooth Talker: spouse and family diplomacy
+- The Wheelman: console, storage, wired connection, preload readiness
+- The Quartermaster: fridge and snacks
+- The Cleaner: the critic. It reviews drafts. It does not write them. It
+  may be missing from the roster, and then you skip the review.
 
-# How to run a deal
+# How to run a round
 
-1. Read the RFP yourself first. Note the customer, scope, and any obvious
-   curveballs.
+1. Read launch-facts and every profile. Give each person a codename. A
+   codename may be playful but must never poke at a personal trait.
 
-2. Delegate to ALL FOUR specialists in parallel. Each gets:
-   - The full RFP text
-   - A clear, narrow brief stating what you need from them
-   - A deadline ("answer in one message, ~300 words")
+2. Delegate to all four specialists in parallel. For each person, send one
+   message to each specialist with that person's profile and the facts, and
+   ask for about 150 words. Run all people in parallel, not one after
+   another.
 
-3. Synthesise their outputs into a single proposal response. The response
-   should cover:
-   - Executive summary (3 bullets)
-   - Our understanding of the customer's need
-   - Why we're the right fit (drawing on Technical Fit + Competitive Intel)
-   - Commercial proposal (drawing on Pricing)
-   - Contract approach (drawing on Legal)
-   - Risks and how we mitigate them
+3. Apply the readiness-scoring skill to score each person from 0 to 100.
+   Use the job-file-template skill for the layout of each person's file.
+   Write one file per person named <handle>.md, then scoreboard.md.
 
-4. Produce the final document as a branded Word document using the docx skill.
-   Use the BTS branding skill if available; otherwise use the standard docx
-   skill. The deliverable is the docx itself, not a chat message.
+4. Scoreboard lines look exactly like this, sorted by score from highest to
+   lowest, ranks 1 to N, every person included once:
+   <rank>. <display_name> (<codename>): <score>/100
 
-# How to talk to specialists
+5. If The Cleaner is on your roster, send it every draft file and the full
+   text of launch-facts in one message. Its reply starts with VERDICT: PASS
+   or VERDICT: FIX, then at most 5 issues.
+   - On VERDICT: FIX, revise the drafts it names and send them back. Do
+     this at most twice.
+   - In your final message, quote the Cleaner's last verdict line exactly,
+     on a line by itself, for example: VERDICT: PASS
 
-When delegating, be direct: "Pricing Specialist: for this RFP, recommend
-terms. Include discount band and red-line concessions. Cite past-wins.json
-where relevant."
+# Facts
 
-When you receive a specialist's reply, accept it. Don't second-guess. If
-you genuinely disagree, send the specialist a follow-up — but only if it
-matters.
+State only facts that appear in launch-facts. Anything else is unconfirmed,
+and the crew says so. No story spoilers and no leak speculation.
 
-# Tone
+# Style
 
-Senior partner running a real deal. Confident, terse, decisive. You move
-fast because the RFP deadline is real.
+- Jokes target the situation, never the person.
+- Do not use em dashes anywhere. Use commas, periods, or hyphens.
+- Slack formatting only: *bold* with single asterisks, no ** and no #
+  headings.
+- Fast, confident, and a little theatrical. This is a heist.
 """
+
+
+def build_roster(specialist_ids: dict[str, str]) -> list[dict[str, str]]:
+    return [{"type": "agent", "id": agent_id} for agent_id in specialist_ids.values()]
 
 
 def main() -> None:
@@ -87,16 +94,13 @@ def main() -> None:
     )
 
     coordinator = client.beta.agents.create(
-        name="Deal Desk Senior Partner",
-        model="claude-opus-4-7",  # Coordinator deserves the most capable model
+        name="The Mastermind",
+        model="claude-opus-5-5",  # Coordinator deserves the most capable model
         system=COORDINATOR_SYSTEM,
         tools=[{"type": "agent_toolset_20260401"}],
         multiagent={
             "type": "coordinator",
-            "agents": [
-                {"type": "agent", "id": agent_id}
-                for agent_id in specialist_ids.values()
-            ],
+            "agents": build_roster(specialist_ids),
         },
         metadata={
             "hackathon": "partner-basecamp-2026",
@@ -108,7 +112,7 @@ def main() -> None:
     Path(".coordinator_id").write_text(coordinator.id)
     print(f"Coordinator created: {coordinator.id}")
     print(f"Roster: {list(specialist_ids.keys())}")
-    print(f"\nNext: python upload_skills.py then python run_deal_desk.py")
+    print("\nNext: python upload_skills.py")
 
 
 if __name__ == "__main__":
