@@ -115,6 +115,8 @@
   #channel { height: 360px; overflow: auto; padding: 14px; background: var(--ocean-deep); border-radius: 6px; border-left: 4px solid var(--flamingo); }
   #channel:empty::before { content: "No messages yet. Start with step 1, then post the kickoff."; opacity: .6; }
   .msg { margin: 0 0 12px; white-space: pre-wrap; max-width: 70ch; }
+  .who { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+  .who svg { display: block; flex: none; }
   .msg b { color: var(--sunset); }
   .msg.bot { padding-left: 10px; border-left: 3px solid var(--pool); }
   .msg.bot b { color: var(--pool); }
@@ -195,6 +197,41 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 const out = $("#out");
+const SVGNS = "http://www.w3.org/2000/svg";
+// Same crab, different prop. Unknown handles still get one.
+const CREW = { jules: "beer", mara: "chips", pia: "soda", otto: "cig", sol: "coffee" };
+const KINDS = ["beer", "cig", "soda", "coffee", "chips"];
+const PROPS = {
+  beer: [[15, 4, 3, 1, "#fff7d0"], [15, 5, 3, 5, "#e8a317"], [18, 6, 1, 2, "#e8a317"]],
+  cig: [[15, 5, 1, 1, "#ff9340"], [16, 5, 3, 1, "#f7e6c8"], [19, 5, 1, 1, "#ff3b1f"], [19, 3, 1, 1, "#ddd", ".6"], [20, 2, 1, 1, "#ddd", ".35"]],
+  soda: [[17, 1, 1, 2, "#fff"], [15, 3, 3, 1, "#c8c4d4"], [15, 4, 3, 6, "#3fe0cf"], [15, 6, 3, 1, "#fff"]],
+  coffee: [[16, 2, 1, 1, "#fff", ".4"], [16, 3, 1, 1, "#fff", ".7"], [15, 5, 3, 4, "#f7e6c8"], [15, 5, 3, 1, "#5c3317"], [18, 6, 1, 2, "#f7e6c8"]],
+  chips: [[15, 3, 3, 1, "#ffe680"], [15, 4, 3, 5, "#ff9340"], [16, 6, 1, 1, "#fff7d0"]],
+};
+function kindFor(handle) {
+  if (handle === "war-room") return "";
+  if (CREW[handle]) return CREW[handle];
+  let n = 0;
+  for (const c of handle) n += c.charCodeAt(0);
+  return KINDS[n % KINDS.length];
+}
+function px(x, y, w, h, fill, opacity) {
+  const r = document.createElementNS(SVGNS, "rect");
+  r.setAttribute("x", x); r.setAttribute("y", y);
+  r.setAttribute("width", w); r.setAttribute("height", h);
+  r.setAttribute("fill", fill);
+  if (opacity) r.setAttribute("opacity", opacity);
+  return r;
+}
+function face(handle) {
+  const svg = $("#crab svg").cloneNode(true);
+  svg.setAttribute("viewBox", "0 0 22 12");
+  svg.setAttribute("width", "44");
+  svg.setAttribute("height", "24");
+  svg.setAttribute("aria-hidden", "true");
+  for (const spec of PROPS[kindFor(handle)] || []) svg.append(px(...spec));
+  return svg;
+}
 
 async function refresh() {
   const r = await fetch("/api/channel");
@@ -205,8 +242,11 @@ async function refresh() {
     const el = document.createElement("div");
     el.className = "msg" + (m.handle === "war-room" ? " bot" : "");
     const who = document.createElement("b"); who.textContent = m.name;
+    const head = document.createElement("span");
+    head.className = "who";
+    head.append(face(m.handle), who);
     const t = document.createElement("i"); t.textContent = " " + m.line + "\n";
-    el.append(who, t, m.text);   // textContent only, no HTML injection
+    el.append(head, t, m.text);   // textContent only, no HTML injection
     return el;
   }));
   box.scrollTop = box.scrollHeight;
