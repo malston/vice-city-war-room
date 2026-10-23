@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 SCOREBOARD_RE = re.compile(r"^(\d+)\. (.+) \((.+)\): (\d{1,3})/100$")
+NUMBERED_LINE_RE = re.compile(r"^\s*\d+\.")
 HEADING_RE = re.compile(r"^ {0,3}#{1,6}\s", re.MULTILINE)
 DOLLAR_RE = re.compile(r"\$(\d+(?:,\d{3})*(?:\.\d+)?)([kmb]?)", re.IGNORECASE)
 DOLLAR_SCALES = {"": 1, "k": 1000, "m": 1000000, "b": 1000000000}
@@ -107,7 +108,10 @@ def check_outputs(profiles_dir: Path, out_dir: Path, facts_path: Path) -> list[C
         "supported_claims": [],
     }
 
-    lines = [line for line in texts.get("scoreboard.md", "").splitlines() if line.strip()]
+    lines = [
+        line for line in texts.get("scoreboard.md", "").splitlines()
+        if NUMBERED_LINE_RE.match(line)
+    ]
     names = Counter()
     previous_score = None
     if not scoreboard.is_file():

@@ -10,3 +10,4 @@ The only game facts the crew may state. Anything not on this list is "unconfirme
 - Digital copies are sold through the PlayStation Store and the Microsoft Store on Xbox (source: PlayStation Store listing, https://store.playstation.com/en-us/concept/10000730 and Xbox game page, https://www.xbox.com/en-US/games/grand-theft-auto-vi)
 - UNCONFIRMED for the crew: price, editions, pre-order bonuses, and pre-load timing. The team FAQ predates these details, so the crew does not state them until the owner approves adding them (source: team launch FAQ, as of August 2026)
 - Thanksgiving is one week after launch, on Thursday, November 26, 2026 (source: US federal holiday calendar, fourth Thursday of November 2026)
+- The team FAQ suggests requesting time off for November 19 and November 20, launch day and the day after. This is advice, not an official date (source: team launch FAQ, preparation list)
