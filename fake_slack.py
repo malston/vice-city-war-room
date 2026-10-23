@@ -26,6 +26,7 @@ from war_room.fake_slack import (
     BOT_NAME,
     DEFAULT_CHANNEL,
     add_message,
+    check_handle,
     first_fenced_block,
     format_message,
     load_channel,
@@ -87,15 +88,30 @@ def show(args: argparse.Namespace) -> int:
     return 0
 
 
+def check_seed(entries: object, path: Path) -> None:
+    if not isinstance(entries, list):
+        raise ValueError(f"{path} must hold a JSON list of messages")
+    for index, entry in enumerate(entries):
+        where = f"Seed message {index} in {path}"
+        if not isinstance(entry, dict):
+            raise ValueError(f"{where} must be an object")
+        missing = [key for key in SEED_KEYS if key not in entry]
+        if missing:
+            raise ValueError(f"{where} is missing: {', '.join(missing)}")
+        if not isinstance(entry["text"], str) or not entry["text"].strip():
+            raise ValueError(f"{where} needs non-blank text")
+        try:
+            check_handle(entry["author_handle"])
+        except ValueError as error:
+            raise ValueError(f"{where} has an {error}")
+
+
 def seed(args: argparse.Namespace) -> int:
     try:
         entries = json.loads(read_text_file(args.file))
     except json.JSONDecodeError as error:
         raise ValueError(f"{args.file} is not valid JSON: {error}")
-    for index, entry in enumerate(entries):
-        missing = [key for key in SEED_KEYS if key not in entry]
-        if missing:
-            raise ValueError(f"Seed message {index} in {args.file} is missing: {', '.join(missing)}")
+    check_seed(entries, args.file)
     for index, entry in enumerate(entries):
         if index:
             time.sleep(args.delay)

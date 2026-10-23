@@ -268,3 +268,72 @@ def test_corrupt_channel_file_exits_with_message(channel):
         run(channel, "show")
 
     assert "is not valid JSON" in str(exit_info.value)
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["reply", "--as", "Otto", "--text", "hi"],
+        ["post", "--as", "ma ra", "--text", "hi"],
+    ],
+)
+def test_an_invalid_handle_exits_with_message_and_stores_nothing(channel, command):
+    with pytest.raises(SystemExit) as exit_info:
+        run(channel, *command)
+
+    assert "invalid handle" in str(exit_info.value)
+    assert not channel.exists()
+
+
+def test_show_with_a_bad_since_exits_with_message(channel):
+    with pytest.raises(SystemExit) as exit_info:
+        run(channel, "show", "--since", "abc")
+
+    assert "Slack timestamp" in str(exit_info.value)
+
+
+def test_read_with_an_empty_since_exits_with_message(channel, tmp_path):
+    out = tmp_path / "messages.json"
+
+    with pytest.raises(SystemExit) as exit_info:
+        run(channel, "read", "--since", "", "--out", str(out))
+
+    assert "Slack timestamp" in str(exit_info.value)
+    assert not out.exists()
+
+
+def test_a_wrong_shaped_channel_file_exits_with_message(channel):
+    channel.write_text(json.dumps([1, 2]))
+
+    with pytest.raises(SystemExit) as exit_info:
+        run(channel, "show")
+
+    assert "message 0 must be an object" in str(exit_info.value)
+
+
+@pytest.mark.parametrize(
+    "entries, expected",
+    [
+        ([seed_message("mara", "one"), seed_message("otto", "  ")], "non-blank text"),
+        ([seed_message("mara", "one"), seed_message("Otto", "two")], "invalid handle"),
+        ([seed_message("mara", "one"), 1], "must be an object"),
+        ([{"author_handle": "mara", "author_name": "Mara", "text": 5}], "non-blank text"),
+    ],
+)
+def test_a_bad_seed_entry_leaves_the_channel_untouched(channel, tmp_path, entries, expected):
+    seed = write_seed(tmp_path, entries)
+
+    with pytest.raises(SystemExit) as exit_info:
+        run(channel, "seed", "--file", str(seed))
+
+    assert expected in str(exit_info.value)
+    assert not channel.exists()
+
+
+def test_a_seed_file_that_is_not_a_list_exits_with_message(channel, tmp_path):
+    seed = write_seed(tmp_path, {"text": "hi"})
+
+    with pytest.raises(SystemExit) as exit_info:
+        run(channel, "seed", "--file", str(seed))
+
+    assert "JSON list" in str(exit_info.value)

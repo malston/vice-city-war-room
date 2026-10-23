@@ -157,3 +157,31 @@ def test_first_fenced_block_returns_the_post_text():
 def test_first_fenced_block_raises_value_error_when_there_is_no_fence():
     with pytest.raises(ValueError, match="code fence"):
         first_fenced_block("just prose")
+
+
+@pytest.mark.parametrize("handle", ["Otto", "ma ra", "../../x", ""])
+def test_add_message_rejects_an_invalid_handle(handle):
+    with pytest.raises(ValueError, match="invalid handle"):
+        add_message([], handle, "Name", "hi", 100.0)
+
+
+@pytest.mark.parametrize("since", ["abc", ""])
+def test_read_since_rejects_a_non_numeric_timestamp(since):
+    with pytest.raises(ValueError, match="Slack timestamp"):
+        read_since([msg("mara", "hi", "100.000000")], since)
+
+
+@pytest.mark.parametrize(
+    "messages, expected",
+    [
+        ([1, 2], "message 0 must be an object"),
+        ([{"text": "hi"}], "message 0 is missing"),
+        ([msg("mara", "hi", "abc")], "message 0 has a ts"),
+    ],
+)
+def test_load_channel_rejects_wrong_shaped_messages(tmp_path, messages, expected):
+    path = tmp_path / "channel.json"
+    path.write_text(json.dumps(messages))
+
+    with pytest.raises(ValueError, match=expected):
+        load_channel(path)

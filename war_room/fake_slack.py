@@ -8,16 +8,46 @@ Functions return new lists and never edit the one they were given.
 import json
 import re
 from datetime import datetime, tzinfo
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
+
+from war_room.profiles import HANDLE_RE
 
 BOT_HANDLE = "war-room"
 BOT_NAME = "War Room"
 DEFAULT_CHANNEL = Path("outputs/demo/channel.json")
 
+MESSAGE_KEYS = ("author_handle", "author_name", "ts", "text")
 TS_STEP = Decimal("0.000001")
 CONTINUATION_INDENT = " " * 6
 FENCED_BLOCK = re.compile(r"```[a-z]*\n(.*?)```", re.DOTALL)
+
+
+def parse_ts(value: object) -> Decimal:
+    try:
+        ts = Decimal(value)
+    except (InvalidOperation, TypeError):
+        ts = None
+    if ts is None or not ts.is_finite():
+        raise ValueError(f"not a Slack timestamp: {value!r}")
+    return ts
+
+
+def check_handle(handle: object) -> None:
+    if not isinstance(handle, str) or not HANDLE_RE.fullmatch(handle):
+        raise ValueError(f"invalid handle: {handle!r}")
+
+
+def validate_message(message: object, where: str) -> None:
+    if not isinstance(message, dict):
+        raise ValueError(f"{where} must be an object")
+    missing = [key for key in MESSAGE_KEYS if key not in message]
+    if missing:
+        raise ValueError(f"{where} is missing: {', '.join(missing)}")
+    try:
+        parse_ts(message["ts"])
+    except ValueError:
+        raise ValueError(f"{where} has a ts that is not a number")
 
 
 def load_channel(path: Path) -> list[dict]:
@@ -29,6 +59,8 @@ def load_channel(path: Path) -> list[dict]:
         raise ValueError(f"{path} is not valid JSON: {error}")
     if not isinstance(messages, list):
         raise ValueError(f"{path} must hold a JSON list of messages")
+    for index, message in enumerate(messages):
+        validate_message(message, f"{path} message {index}")
     return messages
 
 
@@ -47,6 +79,7 @@ def next_ts(messages: list[dict], now: float) -> str:
 def add_message(
     messages: list[dict], handle: str, name: str, text: str, now: float
 ) -> tuple[list[dict], dict]:
+    check_handle(handle)
     if not text.strip():
         raise ValueError("message text is blank")
     message = {
@@ -61,10 +94,11 @@ def add_message(
 def read_since(
     messages: list[dict], since: str | None, include_bot: bool = False
 ) -> list[dict]:
+    after = None if since is None else parse_ts(since)
     return [
         m
         for m in messages
-        if (since is None or Decimal(m["ts"]) > Decimal(since))
+        if (after is None or Decimal(m["ts"]) > after)
         and (include_bot or m["author_handle"] != BOT_HANDLE)
     ]
 
