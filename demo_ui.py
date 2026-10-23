@@ -15,10 +15,17 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from anthropic import Anthropic
+
 from war_room.fake_slack import DEFAULT_CHANNEL, format_message, load_channel
 from war_room.profiles import HANDLE_RE
 
 ROOT = Path(__file__).parent
+LAST_SESSION = ROOT / ".last_session_id"
+CREW_ORDER = (
+    "The Mastermind", "The Fixer", "The Smooth Talker",
+    "The Wheelman", "The Quartermaster", "The Cleaner",
+)
 PAGE = ROOT / "demo_ui.html"
 MESSAGES = "outputs/messages.json"
 ROUND_DIR = Path("outputs/round-1")
@@ -33,6 +40,33 @@ live_lock = threading.Lock()
 def emit(text: str) -> None:
     with live_lock:
         live["text"] += text
+
+
+def summarize_threads(threads) -> list[dict]:
+    lanes: dict[str, dict] = {}
+    for t in threads:
+        lane = lanes.setdefault(t.agent.name, {
+            "name": t.agent.name, "threads": 0, "working": 0, "done": 0,
+            "output_tokens": 0, "active_seconds": 0.0,
+        })
+        lane["threads"] += 1
+        lane["working" if t.status == "running" else "done"] += 1
+        lane["output_tokens"] += t.usage.output_tokens if t.usage else 0
+        lane["active_seconds"] += t.stats.active_seconds if t.stats else 0
+    known = [lanes[name] for name in CREW_ORDER if name in lanes]
+    others = [lane for name, lane in lanes.items() if name not in CREW_ORDER]
+    return [{**lane, "active_seconds": round(lane["active_seconds"], 1)} for lane in known + others]
+
+
+def crew_status() -> dict:
+    if not LAST_SESSION.exists():
+        return {"session": None, "crew": []}
+    session_id = LAST_SESSION.read_text().strip()
+    try:
+        threads = Anthropic().beta.sessions.threads.list(session_id, limit=100).data
+    except Exception as error:  # the page shows the message and keeps polling
+        return {"session": session_id, "crew": [], "error": str(error)[:200]}
+    return {"session": session_id, "crew": summarize_threads(threads)}
 
 
 def run(*cmd: str) -> tuple[int, str]:
@@ -146,6 +180,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path == "/":
             self.send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
+        elif self.path == "/api/crew":
+            self.json(200, crew_status())
         elif self.path == "/api/output":
             with live_lock:
                 self.json(200, dict(live))
