@@ -1,14 +1,18 @@
 # Demo script: Vice City War Room
 
-About 10 minutes. Spoken lines are in quotes. Commands go in the terminal. Everything below was rehearsed once, and the outputs shown are what it printed.
+About 10 minutes. Spoken lines are in quotes. Commands go in the terminal. Steps 1 to 3 were rehearsed on `main`, and the outputs shown are what they printed.
+
+There is also a browser version (`python demo_ui.py`). Its first four buttons and the reply form were checked the same way. The swarm button has not been run yet, so the live crew is optional and only for after a passing dry run.
 
 ## Before you start (2 minutes)
 
 1. Open two terminal windows side by side. In both: `cd` to the repo folder (the one that holds `fake_slack.py`)
-2. Check the branch: `git branch --show-current` should say `slice-6-fake-slack`. Do not switch branches.
+2. Get the latest: `git checkout main && git pull`. Then `git branch --show-current` should say `main`.
 3. Open two browser tabs: the repo README and the issues list on GitHub.
 4. In terminal A, run `python fake_slack.py reset`. It prints `Channel cleared.` or `Channel already empty.`
 5. Make the terminal font big.
+6. Browser version only: in terminal B run `python demo_ui.py` and open `http://127.0.0.1:8765`.
+7. Live crew only: run `python dry_run.py` before the demo. Every line must say PASS. If it doesn't, skip the live crew section.
 
 ## Opening (30 seconds)
 
@@ -74,17 +78,47 @@ Otto's file should show `"console": "PS5"`, `"pto_status": "not yet"`, `"preorde
 
 If you have time, also `cat profiles/pia.json`: `console` is `null`. "Blank means unknown. The crew doesn't guess."
 
+## Browser version (instead of Steps 1 to 3, 3 minutes)
+
+Click the buttons in order. They run the same commands, so the same lines of talk work.
+
+1. **Start clean.** Then **Post the kickoff.** "This is the post people would see."
+2. **Friends reply.** The Channel panel fills, one reply per second. "Five fictional friends, some messy on purpose."
+3. **Replies become profiles.** The Command output panel should end with `Wrote 5 profile(s) to profiles: jules, mara, otto, pia, sol`.
+4. **Reply by hand** (optional, a good moment to involve the room): handle `zed`, text `Console: PS5`. A handle with capital letters or spaces is refused with a message.
+
+If you restart `demo_ui.py`, click Start clean and post the kickoff again.
+
 ## Step 4: where it stands (2 minutes)
 
 Show the GitHub issues list.
 
-"Six slices, one per person. Intake is done and merged. This fake Slack is built and in review. The Cleaner and the output checks are merged. The playbooks and voice, and the posting queue, each have an owner. The part that runs the actual swarm is the big open one, so I can't run the crew live today."
+"Six slices, one per person, and all six are merged: intake, the crew code, the playbooks and voice, the Cleaner and the output checks, the posting queue, and this fake Slack. The one thing I haven't done is run the whole crew live in front of anyone."
+
+If the dry run passed beforehand, say so and do the live crew section below. If it didn't, say it plainly: "It's built, and the dry run is the test."
 
 "Here is what it will look like." Show the README section "Using it from the terminal" and say it is an illustration, not real output.
 
+## Optional: run the crew live (only after a passing dry run)
+
+The agents must already exist (the setup order in `docs/contracts.md`, done once), and the key must be exported in this terminal. Nothing loads `.env`.
+
+```text
+export ANTHROPIC_API_KEY=<your key>
+python run_war_room.py --round 1 --profiles profiles
+python check_outputs.py --profiles profiles --out outputs/round-1 --facts synthetic-data/launch-facts.md
+python fake_slack.py post --file outputs/round-1/mara.md
+python fake_slack.py post --file outputs/round-1/scoreboard.md
+python fake_slack.py show
+```
+
+"Watch the event lines. The four specialists start at the same time, and the Cleaner reviews the draft before anything is final."
+
+The browser buttons 5 and 6 do the same. Button 6 posts every plan without asking. Say so: "In the real flow I approve each one first."
+
 ## If someone asks
 
-- **Why isn't the crew running?** "That's slice 2, the agents and the code that runs them. It's the next thing to land. The plan has its tasks written."
+- **Is the crew running for real?** If you did the live section: "Yes, that was the real crew." If not: "It's merged and built. I haven't run it end to end for an audience yet, and the dry run is how I'll find out."
 - **Where do the facts come from?** "A facts file taken from our launch FAQ. Anything not in it, the crew has to call unconfirmed."
 - **Can it post to Slack by itself?** "No. Nothing posts without my approval."
 - **What stops it being mean?** "The Cleaner reviews every draft, and the rules say jokes go after the situation, never the person."
@@ -93,11 +127,15 @@ Show the GitHub issues list.
 
 ```text
 python fake_slack.py reset
-rm -rf profiles outputs/messages.json
+rm -rf profiles outputs/messages.json outputs/round-1
 ```
+
+If the browser page is running, press Ctrl+C in its terminal.
 
 ## If something goes wrong
 
 - **A step prints a Python error:** run `python fake_slack.py reset` and start again from Step 1.
+- **The browser page won't load, or a button turns red:** use the terminal steps. They run the same commands.
+- **The live crew fails (missing key, missing agent files, a red check):** stop, say "that's the part I'm still proving," and go back to the issues list in Step 4.
 - **`seed` is slow or stuck:** press Ctrl+C, then use `python fake_slack.py reply --as mara --text "Console: PS5"` by hand for two or three people, then continue at Step 3.
 - **`$KICKOFF_TS` is empty (for example after opening a new terminal):** run `python fake_slack.py reset` and redo from Step 1. The variable only lives in the terminal where you set it.
