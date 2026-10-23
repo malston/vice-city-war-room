@@ -11,9 +11,9 @@ Steps 4 and 5 use commands from slices 2 and 4. They work once those slices are 
 
 ## Each round
 
-1. **Approve and post the kickoff.** Take the text from `docs/kickoff-post.md`, edit it if you like, and post it only after you approve it. Note the Slack timestamp (`ts`) of the posted message. Rounds 2 and 3 can reuse the same kickoff and take a new timestamp.
+1. **Approve and post the kickoff.** Take the text from `docs/kickoff-post.md`, edit it if you like, and post it only after you approve it. Note the Slack timestamp (`ts`) of the posted message. Round 1 only: rounds 2 and 3 keep using the round 1 kickoff timestamp, so everyone's earlier answers carry over. For those rounds, post a short update message asking people to reply with any changes.
 
-2. **Save the replies.** In the Claude session, ask Claude to read the channel replies after the kickoff and save them to `outputs/messages-round-N.json`. The file is a JSON list of messages:
+2. **Save the replies.** In the Claude session, ask Claude to read every channel reply since the round 1 kickoff, not only the new ones, and save them to `outputs/messages.json`, replacing the file. The file is a JSON list of messages:
 
    ```json
    [
@@ -31,10 +31,10 @@ Steps 4 and 5 use commands from slices 2 and 4. They work once those slices are 
 3. **Build the profiles.**
 
    ```text
-   python parse_profiles.py --messages outputs/messages-round-N.json --kickoff-ts <ts of the kickoff post>
+   python parse_profiles.py --messages outputs/messages.json --kickoff-ts <ts of the round 1 kickoff post>
    ```
 
-   This writes `profiles/<handle>.json` for each person who replied after the kickoff. It prints one line naming who it wrote, or says nothing was written.
+   This writes `profiles/<handle>.json` for each person who replied after the round 1 kickoff. A later reply updates only the fields it gives. It prints one line naming who it wrote, or says nothing was written.
 
 4. **Run the swarm.**
 
@@ -52,7 +52,7 @@ Steps 4 and 5 use commands from slices 2 and 4. They work once those slices are 
 
    If any check fails, do not post. Fix the cause and rerun step 4.
 
-6. **Review and approve each post.** Read `outputs/round-N/<handle>.md` for every person and `scoreboard.md`. Edit anything you do not like. Ask Claude to post only the ones you approve. A person who looks singled out, or any fact you cannot trace to `launch-facts.md`, stays unposted.
+6. **Review and approve each post.** Read `outputs/round-N/<handle>.md` for every person and `scoreboard.md`. Edit anything you do not like. Ask Claude to post only the ones you approve, as separate channel posts: one per person, then one scoreboard post. A person who looks singled out, or any fact you cannot trace to `launch-facts.md`, stays unposted.
 
 ## Rounds
 
