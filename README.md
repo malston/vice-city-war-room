@@ -97,6 +97,7 @@ Slices 2 and 4 also need `ANTHROPIC_API_KEY` in your environment and a workspace
 - [Design](docs/superpowers/specs/2026-10-23-gta6-war-room-design.md): what we are building and why
 - [Implementation plan](docs/superpowers/plans/2026-10-23-gta6-war-room.md): every task, with files, signatures, and tests
 - [Contracts](docs/contracts.md): the shared file formats, skill names, and commands
+- [Architecture and solution slide](docs/architecture.html): the diagram and one-slide summary for the demo. Open the file in a browser.
 
 ## Ground rules
 
