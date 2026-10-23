@@ -53,18 +53,26 @@ def load_agent_ids() -> dict[str, str]:
     return agent_ids
 
 
+def skills_by_title(skills) -> dict[str, str]:
+    """Map each skill's display_name to its id."""
+    return {skill.display_name: skill.id for skill in skills}
+
+
+def skill_dicts(skills) -> list[dict]:
+    """An agent's attached skills as plain dicts (the SDK returns typed objects)."""
+    return [s if isinstance(s, dict) else s.model_dump() for s in skills or []]
+
+
 def attach_skill(client: Anthropic, agent_key: str, agent_id: str, skill_id: str) -> None:
     print(f"  attaching to `{agent_key}` ({agent_id})...")
     current = client.beta.agents.retrieve(agent_id)
+    attached = skill_dicts(current.skills)
     # Avoid duplicate attachment on re-run
-    already_attached = any(
-        s.get("skill_id") == skill_id for s in (current.skills or [])
-    )
-    if already_attached:
+    if any(s.get("skill_id") == skill_id for s in attached):
         print("  already attached (skipping)")
         return
 
-    new_skills = list(current.skills or []) + [
+    new_skills = attached + [
         {"type": "custom", "skill_id": skill_id, "version": "latest"}
     ]
     client.beta.agents.update(
@@ -87,12 +95,10 @@ def main() -> None:
     client = Anthropic()
 
     # List existing custom skills so we can detect and reuse any prior uploads.
-    # Skills API enforces unique display_title, so retrying with the same title
+    # Skills API enforces unique display_name, so retrying with the same title
     # would otherwise fail. Idempotent retry is essential for dev loops.
     print("Checking for existing skills...")
-    existing_by_title: dict[str, str] = {}
-    for page in client.beta.skills.list(source="custom"):
-        existing_by_title[page.display_title] = page.id
+    existing_by_title = skills_by_title(client.beta.skills.list(source="custom"))
 
     uploaded: dict[str, str] = {}
 
@@ -111,7 +117,7 @@ def main() -> None:
         else:
             print(f"Uploading skill: {skill_name}...")
             skill = client.beta.skills.create(
-                display_title=display_title,
+                display_name=display_title,
                 files=files_from_dir(str(skill_dir)),
             )
             skill_id = skill.id
