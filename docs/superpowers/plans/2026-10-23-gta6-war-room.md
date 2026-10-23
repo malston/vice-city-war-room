@@ -4,7 +4,7 @@
 
 **Goal:** A heist-crew swarm that turns teammates' chat replies into personal launch plans and a team scoreboard, checked by a critic before anything is posted.
 
-**Architecture:** The starter's flat scripts stay (create agents, upload skills, run a session). Testable logic moves into a small `war_room/` package. Four slices meet only at the file contracts in Task 0, so four people can work in parallel. Slack stays outside the code: the owner's Claude session reads replies and posts approved drafts.
+**Architecture:** The starter's flat scripts stay (create agents, upload skills, run a session). Testable logic moves into a small `war_room/` package. Five slices meet only at the file contracts in Task 0, so five people can work in parallel. Slack stays outside the code: the owner's Claude session reads replies and posts approved drafts.
 
 **Tech Stack:** Python 3, `anthropic` SDK with Managed Agents multi-agent (beta header `managed-agents-2026-04-01`), pytest.
 
@@ -38,6 +38,7 @@
 | `war_room/context.py`, `war_room/session.py`, `create_specialists.py`, `create_coordinator.py`, `upload_skills.py`, `run_war_room.py` | 2     | Agents and the runner                     |
 | `synthetic-data/launch-facts.md`, `skills/<name>/SKILL.md` (7 skills)                                                                 | 3     | Facts, playbooks, voice, rubric, template |
 | `war_room/checks.py`, `check_outputs.py`, `create_cleaner.py`, `dry_run.py`, `synthetic-data/profiles/`, `tests/live/`                | 4     | Quality gate and dry run                  |
+| `war_room/movers.py`, `movers.py`, `war_room/post_queue.py`, `post_queue.py`, `docs/posting.md`                                       | 5     | Round movers and the approved-post queue  |
 
 Each slice branches from `main` as `slice-N-<name>` and opens its own PR.
 
@@ -325,8 +326,88 @@ Each slice branches from `main` as `slice-N-<name>` and opens its own PR.
 
 ---
 
-## Task 15: Integration (Mark, after the four PRs merge)
+# Slice 5: Post queue and round movers
+
+Only new files. It reads the scoreboard line format and the `outputs/round-N/` layout from `docs/contracts.md` and needs no API key.
+
+## Task 15: Round movers
+
+**Files:**
+
+- Create: `war_room/movers.py`, `movers.py`, `tests/test_movers.py`
+
+**Interfaces:**
+
+- Produces: `ScoreLine` frozen dataclass (`rank: int`, `display_name: str`, `codename: str`, `score: int`); `Mover` frozen dataclass (`display_name: str`, `before: int | None`, `after: int | None`) with a `delta` property (`after - before`, or `None` when either side is missing); `parse_scoreboard(text: str) -> list[ScoreLine]`; `compare_rounds(previous: list[ScoreLine], current: list[ScoreLine]) -> list[Mover]`; `format_movers_post(movers: list[Mover]) -> str`; `main(argv: list[str] | None = None) -> int`.
+
+- [ ] **Step 1: Write failing tests** in `tests/test_movers.py`:
+  - `test_parse_scoreboard_reads_contract_lines`: `"1. Mara (The Night Owl): 75/100"` gives `ScoreLine(1, "Mara", "The Night Owl", 75)`.
+  - `test_parse_scoreboard_ignores_title_and_blank_lines`.
+  - `test_score_over_100_raises_value_error_naming_the_line` and `test_duplicate_display_names_raise_value_error`.
+  - `test_delta_is_after_minus_before` and `test_delta_is_none_when_either_side_is_missing`.
+  - `test_movers_sorted_by_delta_descending_then_name`, and `test_newcomers_then_dropouts_come_after_movers` (people in both rounds first, then people new this round, then people missing from this round, each by name).
+  - `test_post_names_biggest_climber_and_biggest_drop`: a climber from 30 to 61 appears as `Pia, 30 to 61 (+31)`.
+  - `test_post_omits_drop_when_nobody_dropped`, `test_post_lists_new_crew_members`, and `test_post_says_nobody_moved_when_all_scores_match` (`Nobody moved this round.`).
+  - `test_post_has_slack_formatting_and_no_em_dashes`: no `**`, no line starting with `#`, no em dash.
+  - `test_cli_writes_the_post_to_out` and `test_cli_missing_file_exits_with_message`.
+- [ ] **Step 2: Run** `python -m pytest tests/test_movers.py -v`. Expected: FAIL, module not found.
+- [ ] **Step 3: Implement `war_room/movers.py`.** Scoreboard lines match `^(\d+)\. (.+) \((.+)\): (\d{1,3})/100$`; other lines are ignored. People are matched by `display_name`.
+- [ ] **Step 4: Implement `movers.py`** in the starter's script style: `--prev FILE --curr FILE --out FILE`, a `SystemExit` message for a missing file, and one printed line `Wrote movers post to <out>`.
+- [ ] **Step 5: Run** `python -m pytest -q`. Expected: all PASS, no warnings.
+- [ ] **Step 6: Commit** (`feat: add round movers`).
+
+## Task 16: Post queue
+
+**Files:**
+
+- Create: `war_room/post_queue.py`, `post_queue.py`, `tests/test_post_queue.py`
+
+**Interfaces:**
+
+- Produces: `Post` frozen dataclass (`id: str`, `kind: str`, `handle: str | None`, `text: str`, `status: str`). `kind` is `person`, `scoreboard`, or `movers`; `status` is `pending`, `approved`, or `posted`; ids are `person-<handle>`, `scoreboard`, and `movers`.
+- `QUEUE_FILE = "post-queue.json"`, kept in the round folder.
+- `build_queue(profiles_dir: Path, out_dir: Path, existing: list[Post] | None = None) -> list[Post]`; `load_queue(path: Path) -> list[Post]`; `save_queue(path: Path, posts: list[Post]) -> None`.
+- `approve(posts: list[Post], ids: list[str]) -> list[Post]`; `approve_all(posts: list[Post]) -> list[Post]`; `next_post(posts: list[Post]) -> Post | None`; `mark_posted(posts: list[Post], post_id: str) -> list[Post]`.
+- `main(argv: list[str] | None = None) -> int` with subcommands `build --profiles DIR --out DIR`, `list --out DIR`, `approve --out DIR (ID... | --all)`, `next --out DIR`, and `mark-posted --out DIR ID`.
+
+Rules: order is people by handle, then the scoreboard, then movers when `movers.md` exists. On a rebuild, a post keeps its status when its text is unchanged; changed text resets `approved` to `pending`; `posted` stays `posted`. A profile with no `<handle>.md`, or a missing `scoreboard.md`, raises `ValueError` naming the file.
+
+- [ ] **Step 1: Write failing tests** in `tests/test_post_queue.py`, using real files in `tmp_path`:
+  - `test_build_orders_people_by_handle_then_scoreboard_then_movers` and `test_build_without_a_movers_file_has_no_movers_post`.
+  - `test_build_starts_every_post_pending`.
+  - `test_missing_person_file_raises_value_error_naming_it` and `test_missing_scoreboard_raises_value_error`.
+  - `test_rebuild_keeps_status_when_text_is_unchanged`, `test_rebuild_resets_approved_to_pending_when_text_changes`, and `test_rebuild_keeps_posted_even_when_text_changes`.
+  - `test_approve_marks_only_the_named_posts`, `test_approve_unknown_id_raises_value_error`, `test_approve_is_idempotent`, and `test_approve_does_not_change_a_posted_post`.
+  - `test_next_returns_the_first_approved_post_and_never_a_pending_one` and `test_next_is_none_when_nothing_is_approved`.
+  - `test_mark_posted_requires_approved` and `test_mark_posted_twice_raises_value_error`.
+  - `test_save_then_load_round_trips`.
+  - CLI, with captured output: `test_cli_build_then_list_prints_one_line_per_post` (`<id> <status>`), `test_cli_next_prints_the_text_of_the_next_approved_post`, `test_cli_next_prints_nothing_and_exits_1_when_none_is_approved`, and `test_cli_mark_posted_updates_the_queue_file`.
+- [ ] **Step 2: Run** `python -m pytest tests/test_post_queue.py -v`. Expected: FAIL, module not found.
+- [ ] **Step 3: Implement `war_room/post_queue.py`.** Queue file is a JSON list of posts. Pure functions return new lists and never edit in place.
+- [ ] **Step 4: Implement `post_queue.py`** in the starter's script style, with `SystemExit` messages for a missing queue file or a `ValueError` from the library.
+- [ ] **Step 5: Run** `python -m pytest -q`. Expected: all PASS, no warnings.
+- [ ] **Step 6: Commit** (`feat: add the approved-post queue`).
+
+## Task 17: Posting guide and full-round flow
+
+**Files:**
+
+- Create: `docs/posting.md`, `tests/test_posting_flow.py`
+
+**Interfaces:**
+
+- Consumes: `movers.main`, `post_queue.main` from Tasks 15 and 16.
+
+- [ ] **Step 1: Write the flow test** `test_full_round_flow_posts_each_approved_post_once` with two profiles, their `<handle>.md` files, `scoreboard.md`, and a previous round's scoreboard in `tmp_path`: run `movers.main`, then `post_queue.main(["build", ...])`; `next` prints nothing (exit 1) before any approval; after approving one person, `next` prints that person's text; after `mark-posted`, `next` prints nothing again; after `approve --all`, `next` walks the other person, the scoreboard, then movers, each exactly once, and a pending post is never returned.
+- [ ] **Step 2: Run** `python -m pytest tests/test_posting_flow.py -v`. Expected: PASS. The units already exist, so this test pins that they compose.
+- [ ] **Step 3: Write `docs/posting.md`:** where it fits (after the runbook's output check), `movers.py` for rounds 2 and 3, the queue commands in order, how the Claude session posts (`next` prints the text, the owner confirms, Claude posts it, `mark-posted`), and that a rebuild after editing a draft requires approving that post again.
+- [ ] **Step 4: Commit** (`docs: add the posting guide`), open a PR.
+
+---
+
+## Task 18: Integration (Mark, after the five PRs merge)
 
 - [ ] **Step 1:** Run the setup order from Task 0, then `python dry_run.py`. Expected: PASS.
 - [ ] **Step 2:** Ask Mark before deleting the deal-desk leftovers: `run_deal_desk.py`, `stretch_critic_subagent.py`, `skills/pricing-playbook`, `skills/legal-checklist`, `skills/competitive-intel`, `synthetic-data/rfp-acme-corp.md`, `synthetic-data/past-wins.json`, `synthetic-data/product-overview.md`. Delete only what Mark approves.
-- [ ] **Step 3:** Draft the kickoff post from `docs/kickoff-post.md` and show it to Mark. Post only after approval.
+- [ ] **Step 3:** Point step 6 of `docs/runbook.md` at `docs/posting.md` and add the `movers.py` command to the runbook for rounds 2 and 3.
+- [ ] **Step 4:** Draft the kickoff post from `docs/kickoff-post.md` and show it to Mark. Post only after approval.
