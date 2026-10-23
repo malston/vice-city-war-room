@@ -24,16 +24,58 @@ It is a small, fun way to learn the coordinator plus specialists pattern: one bo
 3. The crew writes a plan for each person and a scoreboard.
 4. The Cleaner checks the drafts, the owner approves them, and they are posted as separate channel messages.
 
+## Using it from the terminal
+
+There are two kinds of agent here, and you talk to only one of them.
+
+| Agent                       | What it is                                                                                                                               | How you deal with it                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Your Claude Code session    | The assistant you chat with in the terminal. It reads the Slack replies, runs the commands, shows you drafts, and posts what you approve | You type plain-English instructions                                                                    |
+| The Mastermind and its crew | Managed Agents running in the cloud. They write the plans                                                                                | You do not chat with them. You start a round, watch their progress scroll by, and read what they wrote |
+
+A round is a conversation with your Claude Code session. This is an illustrative session. The exact wording and output will differ.
+
+```text
+you     run round 1
+claude  Read the channel replies since the kickoff and saved 3 messages to outputs/messages.json.
+claude  python parse_profiles.py --messages outputs/messages.json --kickoff-ts <ts>
+        Wrote 3 profile(s) to profiles: mara, otto, pia
+claude  python run_war_room.py --round 1 --profiles profiles
+        [thread spawned]   The Fixer
+        [thread spawned]   The Smooth Talker
+        [thread spawned]   The Wheelman
+        [thread spawned]   The Quartermaster
+        ...
+        [swarm finished]
+claude  python check_outputs.py --profiles profiles --out outputs/round-1 --facts synthetic-data/launch-facts.md
+        All checks pass.
+claude  Drafts are in outputs/round-1. Here is Mara's plan: ... Approve, edit, or skip?
+you     approve all except Otto's, and make Mara's snack line funnier
+claude  Edited Mara's draft. It needs approving again because the text changed. Approve?
+you     yes, post them
+claude  Posted 3 messages: mara, pia, scoreboard.
+```
+
+What stays in your hands:
+
+- Every step runs when you ask for it. You can stop after any step.
+- Nothing is posted until you approve it. Editing a draft after you approved it means approving it again.
+- If a check fails, Claude tells you what failed and does not post.
+- For rounds 2 and 3, Claude also compares the new scoreboard with the last one and adds a "who moved" post.
+
+The step-by-step version, with the exact commands, is in the runbook (`docs/runbook.md`, slice 1). First-time setup is the order in [`docs/contracts.md`](docs/contracts.md), followed by `python dry_run.py`.
+
 ## Slices
 
 Each slice has a GitHub issue with a task list. Branch from `main` as `slice-N-name`.
 
-| Slice                          | What it builds                                     | Issue                                                        |
-| ------------------------------ | -------------------------------------------------- | ------------------------------------------------------------ |
-| 1. Intake and Slack bridge     | Turns replies into profile files                   | [#1](https://github.com/malston/vice-city-war-room/issues/1) |
-| 2. Crew and swarm core         | The agents and the code that runs them             | [#2](https://github.com/malston/vice-city-war-room/issues/2) |
-| 3. Content and voice           | Facts, playbooks, the heist tone, the score rubric | [#3](https://github.com/malston/vice-city-war-room/issues/3) |
-| 4. The Cleaner and the dry run | Quality checks and an end-to-end test              | [#4](https://github.com/malston/vice-city-war-room/issues/4) |
+| Slice                          | What it builds                                       | Issue                                                          |
+| ------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------- |
+| 1. Intake and Slack bridge     | Turns replies into profile files                     | [#1](https://github.com/malston/vice-city-war-room/issues/1)   |
+| 2. Crew and swarm core         | The agents and the code that runs them               | [#2](https://github.com/malston/vice-city-war-room/issues/2)   |
+| 3. Content and voice           | Facts, playbooks, the heist tone, the score rubric   | [#3](https://github.com/malston/vice-city-war-room/issues/3)   |
+| 4. The Cleaner and the dry run | Quality checks and an end-to-end test                | [#4](https://github.com/malston/vice-city-war-room/issues/4)   |
+| 5. Post queue and round movers | The approval gate for posts and the "who moved" post | [#10](https://github.com/malston/vice-city-war-room/issues/10) |
 
 The slices meet only at the file formats in [`docs/contracts.md`](docs/contracts.md).
 
