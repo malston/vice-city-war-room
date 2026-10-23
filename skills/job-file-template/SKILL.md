@@ -1,6 +1,6 @@
 ---
 name: job-file-template
-description: The Mastermind's template for each crew member's launch plan post and the team scoreboard post, in Slack formatting. Use when writing <handle>.md and scoreboard.md.
+description: The Mastermind's template for each crew member's launch plan post and the team scoreboard post, in Slack formatting. Use when writing each person's file and scoreboard.md.
 ---
 
 # Job File Template (The Mastermind)
