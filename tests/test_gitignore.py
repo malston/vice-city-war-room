@@ -15,7 +15,13 @@ def is_ignored(path: str) -> bool:
 
 @pytest.mark.parametrize(
     "path",
-    [".env", "profiles/mara.json", "outputs/round-1/scoreboard.md"],
+    [
+        ".env",
+        ".envrc",
+        ".skill_ids.json",
+        "profiles/mara.json",
+        "outputs/round-1/scoreboard.md",
+    ],
 )
 def test_real_data_and_secrets_are_ignored(path):
     assert is_ignored(path)

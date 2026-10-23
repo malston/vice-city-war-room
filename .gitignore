@@ -1,9 +1,11 @@
 .env
+.envrc
 /profiles/
 /outputs/
 .specialist_ids.json
 .coordinator_id
 .environment_id
+.skill_ids.json
 .last_session_id
 __pycache__/
 .pytest_cache/
