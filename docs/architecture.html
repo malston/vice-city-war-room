@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vice City War Room</title>
+<style>
+  :root {
+    --bg: #f6f4f1;
+    --surface: #ffffff;
+    --ink: #1c1b22;
+    --muted: #5d5b68;
+    --line: #cfcad6;
+    --accent: #d1307f;
+    --accent-soft: #fbe6f0;
+    --teal: #0e8f89;
+    --teal-soft: #dff3f1;
+    --warn: #a35a00;
+    --warn-soft: #fff0d9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15141a;
+      --surface: #1f1e27;
+      --ink: #f1eff6;
+      --muted: #a7a4b4;
+      --line: #3b3946;
+      --accent: #ff62a8;
+      --accent-soft: #3a1f2e;
+      --teal: #3fd2c9;
+      --teal-soft: #17302f;
+      --warn: #ffb454;
+      --warn-soft: #36290f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15141a; --surface: #1f1e27; --ink: #f1eff6; --muted: #a7a4b4;
+    --line: #3b3946; --accent: #ff62a8; --accent-soft: #3a1f2e;
+    --teal: #3fd2c9; --teal-soft: #17302f; --warn: #ffb454; --warn-soft: #36290f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 6px; }
+  h2 { font-size: 1.2rem; margin: 40px 0 12px; }
+  p.lede { color: var(--muted); margin: 0; max-width: 62ch; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 14px; padding: 24px;
+  }
+  .slide { border-top: 4px solid var(--accent); }
+  .slide h3 { font-size: 1.5rem; line-height: 1.2; margin: 0 0 4px; }
+  .slide .sub { color: var(--muted); margin: 0 0 20px; }
+  .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .col { border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .col h4 { margin: 0 0 8px; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .col p { margin: 0 0 8px; }
+  .col ul { margin: 0; padding-left: 18px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+  .stat { background: var(--teal-soft); border-radius: 10px; padding: 12px 14px; }
+  .stat b { display: block; font-size: 1.6rem; color: var(--teal); line-height: 1.1; }
+  .stat span { color: var(--muted); font-size: .85rem; }
+  .gap {
+    margin-top: 16px; background: var(--warn-soft); color: var(--ink);
+    border-left: 4px solid var(--warn); border-radius: 8px; padding: 10px 14px; font-size: .92rem;
+  }
+  .gap b { color: var(--warn); }
+  .diagram { padding: 16px; }
+  svg { display: block; width: 100%; height: auto; }
+  svg text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; fill: var(--ink); }
+  svg .sub { fill: var(--muted); font-size: 11.5px; }
+  svg .t { font-size: 14px; font-weight: 600; }
+  svg .lbl { font-size: 11.5px; fill: var(--muted); }
+  svg .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+  svg .agent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  svg .critic { fill: var(--teal-soft); stroke: var(--teal); stroke-width: 1.5; }
+  svg .data { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  svg .arrow { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+  svg .arrow-accent { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+  svg .arrow-teal { stroke: var(--teal); stroke-width: 1.8; fill: none; }
+  svg .head { fill: var(--muted); }
+  svg .head-accent { fill: var(--accent); }
+  svg .head-teal { fill: var(--teal); }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; }
+  code { font: .86em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+  .table-wrap { overflow-x: auto; }
+  @media (max-width: 760px) {
+    .cols { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    h1 { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Vice City War Room</h1>
+  <p class="lede">A crew of AI agents that writes each friend a funny, personal GTA 6 launch-day plan plus a readiness scoreboard. Built as a coordinator with parallel specialists and a critic.</p>
+
+  <h2>Solution slide</h2>
+  <section class="card slide" aria-label="Solution slide">
+    <h3>One boss agent, four specialists at once, one critic before anything ships</h3>
+    <p class="sub">The same pattern teams use for proposal desks and deliverable reviews, applied to a game-launch friend group.</p>
+    <div class="cols">
+      <div class="col">
+        <h4>The problem</h4>
+        <p>Everyone has a different console, time-off situation, partner, and snack habit. A plan that fits one person is wrong for the next.</p>
+        <p>One model writing everything is slow and drifts into made-up facts and mean jokes.</p>
+      </div>
+      <div class="col">
+        <h4>The solution</h4>
+        <ul>
+          <li><b>The Mastermind</b> gives each person a codename, fans work out, scores everyone, writes the scoreboard.</li>
+          <li><b>Four specialists</b> run in parallel: time off, spouse and family, console and storage, snacks.</li>
+          <li><b>The Cleaner</b> checks tone, facts, spoilers, formatting. Fix and resubmit, at most twice.</li>
+        </ul>
+      </div>
+      <div class="col">
+        <h4>Guardrails</h4>
+        <ul>
+          <li>Game facts only from <code>launch-facts.md</code>, otherwise "unconfirmed"</li>
+          <li>Jokes target the situation, never the person</li>
+          <li>No spoilers, no em dashes, no invented dates</li>
+          <li>Nothing posts until the owner approves</li>
+        </ul>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>6</b><span>agents: Mastermind, 4 specialists, Cleaner</span></div>
+      <div class="stat"><b>7</b><span>skills attached to the right agents</span></div>
+      <div class="stat"><b>374</b><span>unit tests passing</span></div>
+      <div class="stat"><b>2 of 2</b><span>people got a plan plus a scoreboard in the live run</span></div>
+    </div>
+    <div class="gap"><b>Open item:</b> the scoreboard template (slice 3) adds a title and closing lines, while the contract and checker want ranked lines only. Live output passes 5 of 7 checks; the two scoreboard-format checks wait on that decision.</div>
+  </section>
+
+  <h2>Architecture</h2>
+  <section class="card diagram" aria-label="Architecture diagram">
+    <svg viewBox="0 0 1000 640" role="img" aria-labelledby="dtitle ddesc">
+      <title id="dtitle">Vice City War Room architecture</title>
+      <desc id="ddesc">Replies become profile files. The runner sends profiles and the facts file to the Mastermind, which delegates to four specialists in parallel and a critic, then writes plan files and a scoreboard that are checked and approved before posting.</desc>
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker>
+        <marker id="aha" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head-accent"/></marker>
+        <marker id="aht" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head-teal"/></marker>
+      </defs>
+
+      <!-- Row 1: intake -->
+      <rect class="box" x="20" y="20" width="190" height="64" rx="10"/>
+      <text class="t" x="115" y="48" text-anchor="middle">Friends reply</text>
+      <text class="sub" x="115" y="68" text-anchor="middle">Slack or fake_slack.py</text>
+
+      <rect class="box" x="270" y="20" width="190" height="64" rx="10"/>
+      <text class="t" x="365" y="48" text-anchor="middle">parse_profiles.py</text>
+      <text class="sub" x="365" y="68" text-anchor="middle">replies to profile files</text>
+
+      <rect class="data" x="520" y="20" width="190" height="64" rx="10"/>
+      <text class="t" x="615" y="48" text-anchor="middle">profiles/&lt;handle&gt;.json</text>
+      <text class="sub" x="615" y="68" text-anchor="middle">one per person</text>
+
+      <rect class="data" x="780" y="20" width="200" height="64" rx="10"/>
+      <text class="t" x="880" y="48" text-anchor="middle">launch-facts.md</text>
+      <text class="sub" x="880" y="68" text-anchor="middle">the only allowed game facts</text>
+
+      <path class="arrow" d="M210 52H268" marker-end="url(#ah)"/>
+      <path class="arrow" d="M460 52H518" marker-end="url(#ah)"/>
+
+      <!-- Row 2: runner -->
+      <rect class="box" x="270" y="140" width="440" height="68" rx="10"/>
+      <text class="t" x="490" y="168" text-anchor="middle">run_war_room.py</text>
+      <text class="sub" x="490" y="190" text-anchor="middle">context.py builds the round message · session.py streams the events</text>
+      <path class="arrow" d="M615 84V138" marker-end="url(#ah)"/>
+      <path class="arrow" d="M880 84V112H660V138" marker-end="url(#ah)"/>
+
+      <!-- Row 3: Mastermind -->
+      <rect class="agent" x="270" y="260" width="440" height="72" rx="10"/>
+      <text class="t" x="490" y="290" text-anchor="middle">The Mastermind (coordinator, Opus 5.5)</text>
+      <text class="sub" x="490" y="312" text-anchor="middle">codenames · delegates · scores 0-100 · writes the scoreboard</text>
+      <path class="arrow-accent" d="M490 208V258" marker-end="url(#aha)"/>
+      <text class="lbl" x="502" y="238">one session, all profiles</text>
+
+      <!-- Cleaner -->
+      <rect class="critic" x="780" y="260" width="200" height="72" rx="10"/>
+      <text class="t" x="880" y="290" text-anchor="middle">The Cleaner (critic)</text>
+      <text class="sub" x="880" y="312" text-anchor="middle">tone · facts · spoilers · format</text>
+      <path class="arrow-teal" d="M712 284H778" marker-end="url(#aht)"/>
+      <path class="arrow-teal" d="M778 312H712" marker-end="url(#aht)"/>
+      <text class="lbl" x="745" y="252" text-anchor="middle">drafts + facts</text>
+      <text class="lbl" x="745" y="338" text-anchor="middle">VERDICT: PASS / FIX</text>
+      <text class="lbl" x="880" y="352" text-anchor="middle">on FIX: revise, resubmit, at most twice</text>
+
+      <!-- Row 4: specialists -->
+      <rect class="agent" x="135" y="400" width="150" height="70" rx="10"/>
+      <text class="t" x="210" y="428" text-anchor="middle">The Fixer</text>
+      <text class="sub" x="210" y="448" text-anchor="middle">time off</text>
+      <rect class="agent" x="305" y="400" width="150" height="70" rx="10"/>
+      <text class="t" x="380" y="428" text-anchor="middle">The Smooth Talker</text>
+      <text class="sub" x="380" y="448" text-anchor="middle">spouse and family</text>
+      <rect class="agent" x="475" y="400" width="150" height="70" rx="10"/>
+      <text class="t" x="550" y="428" text-anchor="middle">The Wheelman</text>
+      <text class="sub" x="550" y="448" text-anchor="middle">console, storage, preload</text>
+      <rect class="agent" x="645" y="400" width="150" height="70" rx="10"/>
+      <text class="t" x="720" y="428" text-anchor="middle">The Quartermaster</text>
+      <text class="sub" x="720" y="448" text-anchor="middle">fridge and snacks</text>
+
+      <path class="arrow-accent" d="M400 332L210 398" marker-end="url(#aha)"/>
+      <path class="arrow-accent" d="M450 332L380 398" marker-end="url(#aha)"/>
+      <path class="arrow-accent" d="M530 332L550 398" marker-end="url(#aha)"/>
+      <path class="arrow-accent" d="M580 332L720 398" marker-end="url(#aha)"/>
+      <text class="lbl" x="465" y="375" text-anchor="end">in parallel, once per person</text>
+
+      <!-- Skills strip -->
+      <rect class="data" x="135" y="492" width="660" height="44" rx="10"/>
+      <text class="sub" x="465" y="510" text-anchor="middle">7 skills: pto-playbook · family-diplomacy · launch-readiness-tech · launch-supplies</text>
+      <text class="sub" x="465" y="526" text-anchor="middle">heist-voice (all six agents) · readiness-scoring · job-file-template (Mastermind)</text>
+
+      <!-- Row 5: outputs -->
+      <rect class="data" x="20" y="570" width="190" height="56" rx="10"/>
+      <text class="t" x="115" y="595" text-anchor="middle">outputs/round-N/</text>
+      <text class="sub" x="115" y="613" text-anchor="middle">&lt;handle&gt;.md · scoreboard.md</text>
+      <path class="arrow-accent" d="M270 296H60V568" marker-end="url(#aha)"/>
+      <text class="lbl" x="68" y="440">writes</text>
+      <text class="lbl" x="68" y="456">files</text>
+
+      <rect class="box" x="270" y="570" width="190" height="56" rx="10"/>
+      <text class="t" x="365" y="595" text-anchor="middle">check_outputs.py</text>
+      <text class="sub" x="365" y="613" text-anchor="middle">contract and bait checks</text>
+      <rect class="box" x="520" y="570" width="190" height="56" rx="10"/>
+      <text class="t" x="615" y="595" text-anchor="middle">Owner approves</text>
+      <text class="sub" x="615" y="613" text-anchor="middle">edit means approve again</text>
+      <rect class="box" x="780" y="570" width="200" height="56" rx="10"/>
+      <text class="t" x="880" y="595" text-anchor="middle">Posted to the channel</text>
+      <text class="sub" x="880" y="613" text-anchor="middle">plans, then the scoreboard</text>
+      <path class="arrow" d="M210 598H268" marker-end="url(#ah)"/>
+      <path class="arrow" d="M460 598H518" marker-end="url(#ah)"/>
+      <path class="arrow" d="M710 598H778" marker-end="url(#ah)"/>
+    </svg>
+  </section>
+
+  <h2>The crew</h2>
+  <section class="card">
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Agent</th><th>Job</th><th>Model</th></tr></thead>
+      <tbody>
+        <tr><td>The Mastermind</td><td>Coordinator. Codenames, parallel delegation, scoring, scoreboard, Cleaner loop</td><td>Opus 5.5</td></tr>
+        <tr><td>The Fixer</td><td>Launch-day time off strategy</td><td>Sonnet 5.5</td></tr>
+        <tr><td>The Smooth Talker</td><td>Spouse and family diplomacy</td><td>Sonnet 5.5</td></tr>
+        <tr><td>The Wheelman</td><td>Console, storage, wired connection, preload readiness</td><td>Sonnet 5.5</td></tr>
+        <tr><td>The Quartermaster</td><td>Fridge and snacks</td><td>Haiku 5.5</td></tr>
+        <tr><td>The Cleaner</td><td>Critic. Verdict line plus at most five issues per review</td><td>Opus 5.5</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <h2>Where the slices meet</h2>
+  <section class="card">
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Slice</th><th>Builds</th><th>Hands off through</th></tr></thead>
+      <tbody>
+        <tr><td>1. Intake</td><td>Replies to profile files</td><td><code>profiles/&lt;handle&gt;.json</code></td></tr>
+        <tr><td>2. Crew and swarm core</td><td>The agents and the runner</td><td><code>outputs/round-N/</code> files</td></tr>
+        <tr><td>3. Content and voice</td><td>Facts, playbooks, tone, rubric, template</td><td><code>launch-facts.md</code>, <code>skills/</code></td></tr>
+        <tr><td>4. Cleaner and dry run</td><td>Quality gate, end-to-end check</td><td>Verdict line, <code>check_outputs.py</code></td></tr>
+        <tr><td>5. Post queue and movers</td><td>Approval gate, "who moved" post</td><td><code>post-queue.json</code>, <code>movers.md</code></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+</main>
+</body>
+</html>
