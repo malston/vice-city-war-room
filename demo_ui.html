@@ -104,7 +104,9 @@
   #crab.hop svg { animation: hop .35s ease-out; }
   @keyframes leg { 50%, 100% { transform: translateY(-1px); } }
   @keyframes hop { 50% { transform: translateY(-12px); } }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  #car { position: fixed; left: 0; top: 0; z-index: 9; pointer-events: none; }
+  #car svg { display: block; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } #car { display: none; } }
 </style>
 </head>
 <body>
@@ -147,6 +149,17 @@
   </g>
   <g fill="#111"><rect x="3" y="4" width="10" height="1"/><rect x="4" y="4" width="3" height="2"/><rect x="9" y="4" width="3" height="2"/></g>
   <g fill="#fff" opacity=".7"><rect x="4" y="4" width="1" height="1"/><rect x="9" y="4" width="1" height="1"/></g>
+</svg></div>
+<div id="car" aria-hidden="true"><svg viewBox="0 0 12 20" width="36" height="60" shape-rendering="crispEdges">
+  <g fill="#111"><rect x="0" y="3" width="1" height="4"/><rect x="11" y="3" width="1" height="4"/><rect x="0" y="13" width="1" height="4"/><rect x="11" y="13" width="1" height="4"/></g>
+  <rect x="2" y="0" width="8" height="1" fill="#e8202a"/><rect x="1" y="1" width="10" height="18" fill="#e8202a"/>
+  <rect x="5" y="1" width="2" height="6" fill="#fff" opacity=".8"/>
+  <g fill="#ffe680"><rect x="2" y="0" width="2" height="1"/><rect x="8" y="0" width="2" height="1"/></g>
+  <g fill="#ff9340"><rect x="2" y="19" width="2" height="1"/><rect x="8" y="19" width="2" height="1"/></g>
+  <rect x="2" y="7" width="8" height="2" fill="#3fe0cf" opacity=".7"/>
+  <rect x="2" y="9" width="8" height="6" fill="#3a0a10"/>
+  <g fill="#d97757"><rect x="3" y="10" width="6" height="4"/><rect x="2" y="9" width="1" height="2"/><rect x="9" y="9" width="1" height="2"/></g>
+  <g fill="#111"><rect x="3" y="10" width="6" height="1"/><rect x="4" y="10" width="1" height="2"/><rect x="7" y="10" width="1" height="2"/></g>
 </svg></div>
 <script>
 const $ = (s) => document.querySelector(s);
@@ -212,6 +225,40 @@ document.querySelectorAll("button").forEach((b) => {
   });
 });
 scuttle($(".step"));
+
+const car = $("#car");
+const CW = 36, CH = 60, FLEE = 150;
+const BREAK_MS = 45000, lapsUntilBreak = () => 3 + Math.floor(Math.random() * 3);
+let cx = innerWidth * 0.8, cy = -CH, vx = 0, vy = 140, mx = -1e4, my = -1e4, last = performance.now();
+let laps = lapsUntilBreak(), parkedUntil = 0;
+addEventListener("mousemove", (e) => { mx = e.clientX; my = e.clientY; });
+function drive(t) {
+  const dt = Math.min((t - last) / 1000, 0.05);
+  last = t;
+  if (t < parkedUntil) return requestAnimationFrame(drive);
+  const dx = cx + CW / 2 - mx, dy = cy + CH / 2 - my;
+  const near = Math.hypot(dx, dy) < FLEE;
+  vx += ((near ? Math.sign(dx || 1) * 320 : 0) - vx) * Math.min(1, dt * 8);
+  cx += vx * dt;
+  const max = innerWidth - CW;
+  if (cx <= 0 || cx >= max) {
+    cx = Math.min(Math.max(cx, 0), max);
+    if (near) vy = Math.sign(dy || 1) * Math.abs(vy);   // pinned against a wall: drive away instead
+  }
+  cy += vy * dt;
+  if ((cy > innerHeight && vy > 0) || (cy < -CH && vy < 0)) {
+    vy = -vy;
+    if (--laps === 0) {
+      laps = lapsUntilBreak();
+      parkedUntil = t + BREAK_MS;
+      cx = Math.random() * (innerWidth - CW);
+    }
+  }
+  const angle = Math.atan2(vx * 0.3, -vy) * 180 / Math.PI;
+  car.style.transform = `translate(${cx}px, ${cy}px) rotate(${angle}deg)`;
+  requestAnimationFrame(drive);
+}
+if (!matchMedia("(prefers-reduced-motion: reduce)").matches) requestAnimationFrame(drive);
 refresh();
 </script>
 </body>
