@@ -232,12 +232,18 @@ function face(handle) {
   for (const spec of PROPS[kindFor(handle)] || []) svg.append(px(...spec));
   return svg;
 }
+let lastChannel = null;
 
 async function refresh() {
   const r = await fetch("/api/channel");
   const d = await r.json();
   if (d.error) { $("#channel").textContent = d.error; return; }
   const box = $("#channel");
+  const key = JSON.stringify(d.messages);
+  if (key === lastChannel) return;   // nothing new: leave the scroll position alone
+  lastChannel = key;
+  const wasAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  const keepTop = box.scrollTop;
   box.replaceChildren(...d.messages.map((m) => {
     const el = document.createElement("div");
     el.className = "msg" + (m.handle === "war-room" ? " bot" : "");
@@ -249,7 +255,8 @@ async function refresh() {
     el.append(head, t, m.text);   // textContent only, no HTML injection
     return el;
   }));
-  box.scrollTop = box.scrollHeight;
+  // Follow new messages only if the reader was already at the bottom.
+  box.scrollTop = wasAtBottom ? box.scrollHeight : keepTop;
 }
 
 async function showLiveOutput() {
