@@ -1,8 +1,9 @@
 import json
-import re
 from pathlib import Path
 
 import pytest
+
+from war_room.profiles import HANDLE_RE
 
 PROFILES_DIR = Path("synthetic-data/profiles")
 BAIT_PATH = Path("synthetic-data/bait.json")
@@ -16,8 +17,6 @@ CONTRACT_KEYS = {
     "weakness",
     "raw_reply",
 }
-# Copied from docs/contracts.md until slice 1's war_room.profiles.HANDLE_RE lands.
-HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 BAIT_HANDLES = ("mara", "otto")
 
 
