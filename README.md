@@ -1,83 +1,68 @@
-# Option 3 — Specialist Swarm
+# Vice City War Room
 
-**Concept landed:** Skills, plugins & sub-agents
-**Tech:** [Claude Managed Agents multi-agent](https://platform.claude.com/docs/en/managed-agents/multi-agent) + [custom Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) + the pre-built [docx skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/quickstart)
-**Time:** 60 minutes
-**Output:** A coordinator agent that fans work out to 3-5 specialist sub-agents, each with its own skills, that assemble a real branded Word document.
+A crew of AI agents that writes each person in a friend group a funny, personal plan for GTA 6 launch day (November 19, 2026), plus a readiness scoreboard. The results go into a Slack channel where everyone can reply, argue, and react.
 
-## The pitch
+## Why this exists
 
-This is the architecture that wins the next $50M transformation deal: **coordinator + specialists + skills**. It maps directly to how every services firm structures real work. A senior partner orchestrates; specialists (legal, pricing, technical) own their lanes; the senior partner synthesises and delivers.
+It is a small, fun way to learn the coordinator plus specialists pattern: one boss agent hands work to several expert agents that run at the same time, then combines their answers. Real teams use the same shape for proposal desks and deliverable reviews. This project is built from the specialist-swarm starter kit, using Claude Managed Agents multi-agent (a research preview).
 
-You're going to build exactly that, in 60 minutes, around a Deal Desk scenario. Drop an RFP in, get a branded response doc out, watch the parallelism happen in real time on the events stream.
+## The crew
 
-## Setup (5 min)
+| Agent             | Job                                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| The Mastermind    | Coordinator. Gives each person a codename, hands the profile to the four specialists, writes the scoreboard |
+| The Fixer         | Time off for launch day                                                                                     |
+| The Smooth Talker | Spouse and family diplomacy                                                                                 |
+| The Wheelman      | Console, storage, downloads                                                                                 |
+| The Quartermaster | Fridge and snacks                                                                                           |
+| The Cleaner       | Checks every draft for mean jokes, made-up facts, and spoilers before anything is posted                    |
 
-You need a workspace API key on the Console (multi-agent is currently in research preview — your workspace may need to be granted access).
+## How a round runs
+
+1. People reply to a kickoff post with a few lines: console, time off, spouse risk, preordered, weakness.
+2. Code turns the replies into profile files.
+3. The crew writes a plan for each person and a scoreboard.
+4. The Cleaner checks the drafts, the owner approves them, and they are posted as separate channel messages.
+
+## Slices
+
+Each slice has a GitHub issue with a task list. Branch from `main` as `slice-N-name`.
+
+| Slice                          | What it builds                                     | Issue                                                        |
+| ------------------------------ | -------------------------------------------------- | ------------------------------------------------------------ |
+| 1. Intake and Slack bridge     | Turns replies into profile files                   | [#1](https://github.com/malston/vice-city-war-room/issues/1) |
+| 2. Crew and swarm core         | The agents and the code that runs them             | [#2](https://github.com/malston/vice-city-war-room/issues/2) |
+| 3. Content and voice           | Facts, playbooks, the heist tone, the score rubric | [#3](https://github.com/malston/vice-city-war-room/issues/3) |
+| 4. The Cleaner and the dry run | Quality checks and an end-to-end test              | [#4](https://github.com/malston/vice-city-war-room/issues/4) |
+
+The slices meet only at the file formats in [`docs/contracts.md`](docs/contracts.md).
+
+## Getting started
 
 ```bash
-cd 03-specialist-swarm
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY="sk-ant-..."
+python -m pytest
 ```
 
-## Pick a scenario card
+Slices 2 and 4 also need `ANTHROPIC_API_KEY` in your environment and a workspace with multi-agent access.
 
-Three cards in [`scenario-cards.md`](./scenario-cards.md). Each gives you a coordinator + a different roster of specialists. Pick one. Different teams should pick different cards.
+1. Branch off `main`.
+2. Find your tasks in the plan and write the tests first.
+3. Open one PR when your slice is done.
 
-## Core build (25 min)
+## Docs
 
-1. **Create the specialists.** Run `python create_specialists.py`. This creates 3-4 sub-agents (Pricing, Legal, Technical Fit, Competitive) and saves their IDs to `.specialist_ids.json`.
+- [Design](docs/superpowers/specs/2026-10-23-gta6-war-room-design.md): what we are building and why
+- [Implementation plan](docs/superpowers/plans/2026-10-23-gta6-war-room.md): every task, with files, signatures, and tests
+- [Contracts](docs/contracts.md): the shared file formats, skill names, and commands
 
-2. **Create the coordinator.** Run `python create_coordinator.py`. This creates the coordinator agent with `multiagent: coordinator` config, listing the specialists in its callable roster.
+## Ground rules
 
-3. **Upload the skills.** Run `python upload_skills.py`. This packages the custom skills in `skills/` and uploads them via the Skills API. Each specialist gets the skill that matches its domain.
+- The repo is public. No real names, chat replies, or keys in it. `.gitignore` covers `.env`, `/profiles/`, and `/outputs/`.
+- Nothing posts to Slack without the owner's approval.
+- No em dashes in anything the crew writes.
+- End-to-end tests use the real API, with no mocks.
 
-4. **Run the deal.** Run `python run_deal_desk.py`. This:
-   - Uploads the synthetic RFP (`synthetic-data/rfp-acme-corp.md`) as a file
-   - Starts a session against the coordinator
-   - Asks the coordinator to produce a full proposal response
-   - Streams the events so you can watch the parallel thread fan-out
-   - Saves the final docx to `outputs/proposal-response.docx`
+## Starter files still in the repo
 
-By minute 30 you have a Word document in `outputs/`, generated by a coordinator + specialists who each used their own skill.
-
-## Stretch goals (20 min)
-
-See [`stretch-goals.md`](./stretch-goals.md). The big ones:
-
-- **Custom firm-voice skill** — codify your own firm's voice (every services firm has one)
-- **Critic sub-agent** — add a fifth agent that reviews the coordinator's draft before it's finalised
-- **Memory across deals** — coordinator remembers past wins and re-uses the right ones
-- **Synthetic MCP for past wins** — wire up a fake CRM to the pricing specialist
-
-## Two-minute demo
-
-Two-monitor setup:
-- **Monitor 1:** the events stream from the coordinator session, scrolling. You'll see `session.thread_created` × 4, parallel `running`, then `agent.thread_message_received` flowing back. The visible parallelism IS the demo.
-- **Monitor 2:** open `outputs/proposal-response.docx`. Real document, branded, ready to send.
-
-Narrate the events stream while it runs. The room will get it.
-
-## What's in this folder
-
-```
-03-specialist-swarm/
-├── README.md
-├── scenario-cards.md
-├── stretch-goals.md
-├── requirements.txt
-├── create_specialists.py          (creates the sub-agents)
-├── create_coordinator.py          (creates the coordinator)
-├── upload_skills.py               (uploads custom skills via Skills API)
-├── run_deal_desk.py               (runs the full swarm against an RFP)
-├── stretch_critic_subagent.py     (stretch: critic agent)
-├── skills/                        (custom skills, one per specialist)
-│   ├── pricing-playbook/SKILL.md
-│   ├── legal-checklist/SKILL.md
-│   └── competitive-intel/SKILL.md
-└── synthetic-data/
-    ├── rfp-acme-corp.md           (the RFP that triggers the swarm)
-    ├── past-wins.json             (used by pricing specialist)
-    └── product-overview.md        (used by technical specialist)
-```
+The Deal Desk files from the starter kit (`run_deal_desk.py`, `stretch_critic_subagent.py`, `scenario-cards.md`, `stretch-goals.md`, and the pricing, legal, and competitive skills and sample data) are still here. The final integration task decides what to delete, with the owner's approval.
