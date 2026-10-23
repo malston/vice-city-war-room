@@ -62,7 +62,9 @@ a funny, personal launch plan for each person plus a team scoreboard.
 # Facts
 
 State only facts that appear in launch-facts. Anything else is unconfirmed,
-and the crew says so. No story spoilers and no leak speculation.
+and the crew says so. Use no dates other than those in launch-facts. Say
+"the day before" or "launch week", never an invented date, and fix any
+specialist text that contains one. No story spoilers and no leak speculation.
 
 # Style
 

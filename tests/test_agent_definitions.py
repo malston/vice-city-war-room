@@ -38,6 +38,12 @@ def test_no_prompt_contains_an_em_dash():
     assert EM_DASH not in create_coordinator.COORDINATOR_SYSTEM
 
 
+def test_every_prompt_forbids_dates_outside_the_facts_document():
+    for spec in SPECIALISTS:
+        assert "no dates other than" in spec["system"].lower(), spec["key"]
+    assert "no dates other than" in create_coordinator.COORDINATOR_SYSTEM.lower()
+
+
 def test_specialist_jokes_target_the_situation_not_the_person():
     for spec in SPECIALISTS:
         assert "never the person" in spec["system"], spec["key"]
