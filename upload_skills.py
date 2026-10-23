@@ -114,6 +114,12 @@ def main() -> None:
         if display_title in existing_by_title:
             skill_id = existing_by_title[display_title]
             print(f"Reusing existing skill: {skill_name} ({skill_id})")
+            # Agents attach skills at version "latest", so push the current
+            # files as a new version or edits to SKILL.md never reach them.
+            client.beta.skills.versions.create(
+                skill_id, files=files_from_dir(str(skill_dir))
+            )
+            print("  pushed current files as a new version")
         else:
             print(f"Uploading skill: {skill_name}...")
             skill = client.beta.skills.create(
