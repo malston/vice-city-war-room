@@ -17,6 +17,8 @@ def is_ignored(path: str) -> bool:
     "path",
     [
         ".env",
+        ".env.bedrock",
+        "bedrock.env",
         ".envrc",
         ".skill_ids.json",
         "profiles/mara.json",

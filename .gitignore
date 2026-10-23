@@ -1,4 +1,6 @@
 .env
+.env.bedrock
+bedrock.env
 .envrc
 /profiles/
 /outputs/
