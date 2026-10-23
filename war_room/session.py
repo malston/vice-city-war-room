@@ -33,6 +33,50 @@ def safe_output_path(out_dir: Path, filename: str) -> Path:
     return out_dir / name
 
 
+class EventPrinter:
+    """Prints session events live and keeps the agent's text.
+
+    Agent text arrives in pieces with no line breaks, so an event label
+    printed right after it would run on to the same line. Labels always
+    start on a fresh line.
+    """
+
+    def __init__(self) -> None:
+        self.parts: list[str] = []
+        self._mid_line = False
+
+    def _line(self, text: str) -> None:
+        if self._mid_line:
+            print()
+            self._mid_line = False
+        print(text, flush=True)
+
+    def handle(self, event) -> bool:
+        """Print one event. Returns True when the session has gone idle."""
+        t = event.type
+        if t == "session.thread_created":
+            self._line(f"  [thread spawned]   {event.agent_name}")
+        elif t == "session.thread_status_running":
+            self._line(f"  [thread running]   {getattr(event, 'agent_name', '?')}")
+        elif t == "agent.thread_message_received":
+            self._line(f"  [reply <-]         {event.from_agent_name}")
+        elif t == "agent.thread_message_sent":
+            self._line(f"  [delegate ->]      {event.to_agent_name}")
+        elif t == "agent.message":
+            for block in event.content:
+                if getattr(block, "type", None) == "text":
+                    self.parts.append(block.text)
+                    print(block.text, end="", flush=True)
+                    self._mid_line = bool(block.text) and not block.text.endswith("\n")
+        elif t == "agent.tool_use":
+            self._line(f"  [tool: {getattr(event, 'name', '?')}]")
+        elif t == "session.status_idle":
+            self._line("")
+            self._line("[swarm finished]")
+            return True
+        return False
+
+
 def run_session(
     client: Anthropic,
     agent_id: str,
@@ -48,7 +92,7 @@ def run_session(
     Path(".last_session_id").write_text(session.id)
 
     print("\n=== EVENT STREAM ===\n")
-    text_parts: list[str] = []
+    printer = EventPrinter()
 
     with client.beta.sessions.events.stream(session.id) as stream:
         client.beta.sessions.events.send(
@@ -61,28 +105,10 @@ def run_session(
             ],
         )
         for event in stream:
-            t = event.type
-            if t == "session.thread_created":
-                print(f"  [thread spawned]   {event.agent_name}", flush=True)
-            elif t == "session.thread_status_running":
-                name = getattr(event, "agent_name", "?")
-                print(f"  [thread running]   {name}", flush=True)
-            elif t == "agent.thread_message_received":
-                print(f"  [reply <-]         {event.from_agent_name}", flush=True)
-            elif t == "agent.thread_message_sent":
-                print(f"  [delegate ->]      {event.to_agent_name}", flush=True)
-            elif t == "agent.message":
-                for block in event.content:
-                    if getattr(block, "type", None) == "text":
-                        text_parts.append(block.text)
-                        print(block.text, end="", flush=True)
-            elif t == "agent.tool_use":
-                print(f"\n  [tool: {getattr(event, 'name', '?')}]", flush=True)
-            elif t == "session.status_idle":
-                print("\n\n[swarm finished]")
+            if printer.handle(event):
                 break
 
-    return SessionResult(session_id=session.id, text="".join(text_parts))
+    return SessionResult(session_id=session.id, text="".join(printer.parts))
 
 
 def download_files(client: Anthropic, session_id: str, out_dir: Path) -> list[Path]:
