@@ -41,10 +41,10 @@ def port():
 
 @pytest.fixture
 def make(port, tmp_path):
-    def run(*args):
+    def run(*args, env=None):
         return subprocess.run(
             ["make", *args, f"DEMO_UI_PORT={port}", f"PYTHON={sys.executable}", f"LOG={tmp_path / 'ui.log'}"],
-            cwd=ROOT, capture_output=True, text=True, timeout=60,
+            cwd=ROOT, capture_output=True, text=True, timeout=60, env=env,
         )
 
     yield run
@@ -158,3 +158,38 @@ def test_stop_leaves_alone_a_process_that_is_not_the_demo_page(make, port, fake_
     assert result.returncode != 0
     assert "not touching it" in result.stdout
     assert other.poll() is None
+
+
+def server_environment(port: int) -> str:
+    listener = subprocess.run(
+        ["lsof", f"-tiTCP:{port}", "-sTCP:LISTEN"], capture_output=True, text=True
+    ).stdout.split()[0]
+    return subprocess.run(["ps", "eww", "-p", listener], capture_output=True, text=True).stdout
+
+
+def env_file_with_key(tmp_path, key: str) -> Path:
+    path = tmp_path / "env"
+    path.write_text(f"ANTHROPIC_API_KEY={key}\n")
+    return path
+
+
+def test_start_prefers_a_key_already_in_the_environment_over_the_env_file(make, port, tmp_path):
+    env_file = env_file_with_key(tmp_path, "fake-key-from-file")
+    env = {**os.environ, "ANTHROPIC_API_KEY": "fake-key-from-shell"}
+
+    started = make("ui", f"ENV_FILE={env_file}", env=env)
+
+    assert started.returncode == 0, started.stdout + started.stderr
+    page_env = server_environment(port)
+    assert "ANTHROPIC_API_KEY=fake-key-from-shell" in page_env
+    assert "fake-key-from-file" not in page_env
+
+
+def test_start_uses_the_env_file_key_when_the_environment_has_none(make, port, tmp_path):
+    env_file = env_file_with_key(tmp_path, "fake-key-from-file")
+    env = {name: value for name, value in os.environ.items() if name != "ANTHROPIC_API_KEY"}
+
+    started = make("ui", f"ENV_FILE={env_file}", env=env)
+
+    assert started.returncode == 0, started.stdout + started.stderr
+    assert "ANTHROPIC_API_KEY=fake-key-from-file" in server_environment(port)
