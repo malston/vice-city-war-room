@@ -1,12 +1,14 @@
 # Start and stop the browser demo (demo_ui.py). Run `make` to see the targets.
 #
 # Needs make, lsof, pgrep, and curl. The page starts in the background and its
-# output goes to $(LOG). It reads .env if there is one, because nothing else
-# loads it and the swarm step needs ANTHROPIC_API_KEY.
+# output goes to $(LOG). The swarm step needs ANTHROPIC_API_KEY. A key already in
+# your environment (for example from direnv) is used as is. Without one, the key
+# comes from $(ENV_FILE) if that file exists.
 
 PYTHON ?= python
 DEMO_UI_PORT ?= 8765
 LOG ?= outputs/demo-ui.log
+ENV_FILE ?= ./.env
 URL = http://127.0.0.1:$(DEMO_UI_PORT)
 LISTENER = lsof -tiTCP:$(DEMO_UI_PORT) -sTCP:LISTEN 2>/dev/null | head -1
 
@@ -19,7 +21,7 @@ help: ## Show this list
 ui: ## Start the demo page in the background
 	@mkdir -p $(dir $(LOG)); \
 	if [ -n "$$($(LISTENER))" ]; then echo "Already running at $(URL)"; exit 0; fi; \
-	[ -f .env ] && { set -a; . ./.env; set +a; }; \
+	[ -f "$(ENV_FILE)" ] && { saved="$$ANTHROPIC_API_KEY"; set -a; . "$(ENV_FILE)"; set +a; [ -z "$$saved" ] || ANTHROPIC_API_KEY="$$saved"; }; \
 	DEMO_UI_PORT=$(DEMO_UI_PORT) nohup $(PYTHON) demo_ui.py > $(LOG) 2>&1 & \
 	for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do \
 	  if curl -s -o /dev/null $(URL)/; then echo "Demo page running at $(URL) (log: $(LOG))"; exit 0; fi; \
