@@ -26,7 +26,7 @@ def main() -> None:
 
     client = Anthropic()
     environment = client.beta.environments.create(
-        name="specialist-swarm-env",
+        name="gta6-war-room-env",
         config={
             "type": "cloud",
             "networking": {"type": "unrestricted"},

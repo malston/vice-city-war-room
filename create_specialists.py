@@ -121,8 +121,7 @@ def main() -> None:
             system=spec["system"],
             tools=[{"type": "agent_toolset_20260401"}],
             metadata={
-                "hackathon": "partner-basecamp-2026",
-                "track": "specialist-swarm",
+                "project": "gta6-war-room",
                 "role": spec["key"],
             },
         )
