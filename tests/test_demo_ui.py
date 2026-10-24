@@ -210,3 +210,174 @@ def test_summarize_threads_names_an_advisor_thread_by_its_type():
     (lane,) = demo_ui.summarize_threads([advisor_thread])
 
     assert lane["name"] == "advisor"
+
+
+@pytest.fixture
+def demo_root(tmp_path, monkeypatch):
+    """A temporary project folder for the page to work in, so tests never touch real outputs."""
+    monkeypatch.setattr(demo_ui, "ROOT", tmp_path)
+    round_dir = tmp_path / "outputs" / "round-1"
+    round_dir.mkdir(parents=True)
+    (tmp_path / "profiles").mkdir()
+    for handle in ("jules", "mara"):
+        (tmp_path / "profiles" / f"{handle}.json").write_text("{}")
+        (round_dir / f"{handle}.md").write_text(f"*The Job: {handle.title()}*\nPlan for {handle}.\n")
+    (round_dir / "scoreboard.md").write_text("*Board*\n1. Jules (A): 90/100\n2. Mara (B): 70/100\n")
+    return tmp_path
+
+
+def queue_statuses(server):
+    return {post["id"]: post["status"] for post in get_json(f"{server}/api/queue")["posts"]}
+
+
+def posted_texts(demo_root):
+    from war_room.fake_slack import load_channel
+
+    return [message["text"] for message in load_channel(demo_root / "outputs" / "demo" / "channel.json")]
+
+
+def test_queue_endpoint_is_empty_before_the_queue_is_built(server, demo_root):
+    assert get_json(f"{server}/api/queue") == {"posts": []}
+
+
+def test_review_step_builds_the_queue_with_everything_pending(server, demo_root):
+    status, body = post_json(f"{server}/api/step/queue", {})
+
+    assert status == 200 and body["ok"]
+    posts = get_json(f"{server}/api/queue")["posts"]
+    assert [post["id"] for post in posts] == ["person-jules", "person-mara", "scoreboard"]
+    assert {post["status"] for post in posts} == {"pending"}
+    assert posts[1]["text"].startswith("*The Job: Mara*")
+
+
+def test_post_step_refuses_while_nothing_is_approved(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+
+    status, body = post_json(f"{server}/api/step/post", {})
+
+    assert status == 400
+    assert "Nothing is approved" in body["output"]
+    assert not (demo_root / "outputs" / "demo" / "channel.json").exists()
+
+
+def test_post_step_without_a_built_queue_says_to_review_first(server, demo_root):
+    status, body = post_json(f"{server}/api/step/post", {})
+
+    assert status == 400
+    assert "Review the drafts first" in body["output"]
+
+
+def test_approve_step_approves_only_the_chosen_posts(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+
+    status, _ = post_json(f"{server}/api/step/approve", {"ids": ["person-mara"]})
+
+    assert status == 200
+    assert queue_statuses(server) == {
+        "person-jules": "pending",
+        "person-mara": "approved",
+        "scoreboard": "pending",
+    }
+
+
+def test_approve_step_can_approve_everything(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+
+    post_json(f"{server}/api/step/approve", {"all": True})
+
+    assert set(queue_statuses(server).values()) == {"approved"}
+
+
+@pytest.mark.parametrize("body", [{}, {"ids": []}, {"ids": "person-mara"}])
+def test_approve_step_needs_posts_or_all(server, demo_root, body):
+    post_json(f"{server}/api/step/queue", {})
+
+    status, response = post_json(f"{server}/api/step/approve", body)
+
+    assert status == 400
+    assert "Choose" in response["output"]
+    assert set(queue_statuses(server).values()) == {"pending"}
+
+
+def test_approve_step_rejects_an_unknown_post_and_changes_nothing(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+
+    status, response = post_json(f"{server}/api/step/approve", {"ids": ["person-mara", "person-nobody"]})
+
+    assert status == 400
+    assert "person-nobody" in response["output"]
+    assert set(queue_statuses(server).values()) == {"pending"}
+
+
+def test_approve_step_without_a_built_queue_says_to_review_first(server, demo_root):
+    status, body = post_json(f"{server}/api/step/approve", {"all": True})
+
+    assert status == 400
+    assert "Review the drafts first" in body["output"]
+
+
+def test_post_step_posts_only_approved_drafts_in_order_and_marks_them_posted(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+    post_json(f"{server}/api/step/approve", {"ids": ["scoreboard", "person-mara"]})
+
+    status, body = post_json(f"{server}/api/step/post", {})
+
+    assert status == 200 and body["ok"]
+    texts = posted_texts(demo_root)
+    assert [text.splitlines()[0] for text in texts] == ["*The Job: Mara*", "*Board*"]
+    assert queue_statuses(server) == {
+        "person-jules": "pending",
+        "person-mara": "posted",
+        "scoreboard": "posted",
+    }
+
+
+def test_nothing_is_posted_twice(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+    post_json(f"{server}/api/step/approve", {"all": True})
+    post_json(f"{server}/api/step/post", {})
+
+    status, body = post_json(f"{server}/api/step/post", {})
+
+    assert status == 400
+    assert "Nothing is approved" in body["output"]
+    assert len(posted_texts(demo_root)) == 3
+
+
+def test_a_draft_edited_after_approval_is_posted_only_after_it_is_approved_again(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+    post_json(f"{server}/api/step/approve", {"all": True})
+    (demo_root / "outputs" / "round-1" / "mara.md").write_text("*The Job: Mara*\nA different plan.\n")
+
+    post_json(f"{server}/api/step/queue", {})
+
+    assert queue_statuses(server) == {
+        "person-jules": "approved",
+        "person-mara": "pending",
+        "scoreboard": "approved",
+    }
+    post_json(f"{server}/api/step/post", {})
+    assert not any("A different plan." in text or "Plan for mara." in text for text in posted_texts(demo_root))
+
+
+def test_the_post_uses_the_approved_text_not_whatever_is_in_the_file_now(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+    post_json(f"{server}/api/step/approve", {"ids": ["person-mara"]})
+    (demo_root / "outputs" / "round-1" / "mara.md").write_text("*The Job: Mara*\nSneaky change.\n")
+
+    post_json(f"{server}/api/step/post", {})
+
+    (text,) = posted_texts(demo_root)
+    assert "Plan for mara." in text
+    assert "Sneaky change." not in text
+
+
+def test_a_long_argument_is_shortened_in_the_command_line_shown_but_not_in_the_command():
+    long_text = "x" * 400
+
+    code, text = demo_ui.run("-c", f"import sys; print(len(sys.argv[1]))", long_text)
+
+    assert code == 0
+    assert text.splitlines()[0].endswith("...")
+    assert len(text.splitlines()[0]) < 200
+    assert text.splitlines()[1] == "400"
