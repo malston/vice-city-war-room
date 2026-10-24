@@ -2,8 +2,6 @@
 
 One round turns people's replies into personal launch plans and a scoreboard. The owner approves every post before it is sent.
 
-Steps 4 and 5 use commands from slices 2 and 4. They work once those slices are merged.
-
 ## Before the first round
 
 1. Run the setup order in `contracts.md`.
