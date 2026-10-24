@@ -177,13 +177,13 @@
     <div class="panel">
       <h2>Run the demo</h2>
       <ol>
-        <li><button class="step" data-step="reset"><b>Start clean</b><small>Clear the channel</small></button></li>
+        <li><button class="step" data-step="reset"><b>Start clean</b><small>Clear the channel and the post queue</small></button></li>
         <li><button class="step" data-step="kickoff"><b>Post the kickoff</b><small>Saves the kickoff timestamp</small></button></li>
         <li><button class="step" data-step="seed"><b>Friends reply</b><small>Five fictional people, one per second</small></button></li>
         <li><button class="step" data-step="profiles"><b>Replies become profiles</b><small>Reads the channel and parses each reply</small></button></li>
         <li><button class="step" data-step="swarm" data-fx="flame"><b>Run the swarm and check</b><small>Needs ANTHROPIC_API_KEY and agents set up</small></button></li>
         <li><button class="step" data-step="queue"><b>Review the drafts</b><small>Builds the post queue. Nothing is posted yet</small></button></li>
-        <li><button class="step" data-step="post" data-fx="flame"><b>Post the approved</b><small>Only approved drafts, then the scoreboard</small></button></li>
+        <li><button class="step" data-step="post" data-fx="flame"><b>Post the approved</b><small>Only approved drafts, in queue order</small></button></li>
       </ol>
     </div>
     <div class="panel">
@@ -333,11 +333,17 @@ async function refreshCrew() {
 
 let lastDrafts = "";
 
+function showDraftsProblem(message) {
+  lastDrafts = "";
+  $("#approve-all").disabled = true;
+  $("#drafts").textContent = message;
+}
+
 async function refreshDrafts() {
   try {
     const d = await (await fetch("/api/queue")).json();
     const box = $("#drafts");
-    if (d.error) { box.textContent = d.error; return; }
+    if (d.error) return showDraftsProblem(d.error);
     const signature = JSON.stringify(d.posts);
     if (signature === lastDrafts) return;
     lastDrafts = signature;
@@ -356,7 +362,9 @@ async function refreshDrafts() {
       el.append(head, text);   // textContent only, no HTML injection
       return el;
     }));
-  } catch (e) { /* the next poll will try again */ }
+  } catch (e) {
+    showDraftsProblem("The draft list is out of date: the page cannot reach the demo server. Reload once it is running.");
+  }
 }
 
 async function step(name, btn, body = {}) {

@@ -1,6 +1,6 @@
 # Demo: running a round with the fake channel
 
-This walk-through needs no Slack connection. The replies come from fictional people, and the plans are posted into a channel kept in `outputs/demo/channel.json`. The swarm step (step 6) needs three things: a crew set up with `make crew-setup`, an `ANTHROPIC_API_KEY` for the workspace where that crew was created (the README explains), and a passing `python dry_run.py`. There is also a browser version of the same steps, described near the end.
+This walk-through needs no Slack connection. The replies come from fictional people, and the plans are posted into a channel kept in `outputs/demo/channel.json`. The swarm step (step 6 here, button 5 in the browser version) needs three things: a crew set up with `make crew-setup`, an `ANTHROPIC_API_KEY` for the workspace where that crew was created (the README explains), and a passing `python dry_run.py`. There is also a browser version of the same steps, described near the end.
 
 In the real flow your Claude session reads and posts through Slack. Here the same three steps are `fake_slack.py` commands: save the replies, post the kickoff, and post the plans.
 
@@ -82,7 +82,7 @@ Open `http://127.0.0.1:8765`. The page binds to your own machine only, and each 
 
 | Button                     | Runs                                                                                   |
 | -------------------------- | -------------------------------------------------------------------------------------- |
-| 1. Start clean             | `fake_slack.py reset`                                                                  |
+| 1. Start clean             | `fake_slack.py reset`, and deletes `outputs/round-1/post-queue.json`                   |
 | 2. Post the kickoff        | `fake_slack.py post --file docs/kickoff-post.md --fenced`, and remembers the timestamp |
 | 3. Friends reply           | `fake_slack.py seed --delay 1`, one reply per second                                   |
 | 4. Replies become profiles | `fake_slack.py read` then `parse_profiles.py`                                          |
@@ -90,7 +90,7 @@ Open `http://127.0.0.1:8765`. The page binds to your own machine only, and each 
 | 6. Review the drafts       | `post_queue.py build` then `list`. Nothing is posted yet                               |
 | 7. Post the approved       | `fake_slack.py post` for each approved draft, then `post_queue.py mark-posted`         |
 
-The Channel panel updates as messages arrive, and the Command output panel shows what the last button printed. The Crew panel shows one lane per agent during the swarm step: how many of its drafts are working, done, or stopped, plus tokens and active seconds. It stops updating once nothing is running. "Reply by hand" posts one message as a teammate; it needs a valid handle (lowercase letters, digits, `_` or `-`) and some text.
+Button numbers here differ from the terminal walk-through above, which counts saving the replies and building the profiles as separate steps. The Channel panel updates as messages arrive, and the Command output panel shows what the last button printed. The Drafts panel lists each post with its status (pending, approved, or posted), an Approve button, and Approve all. The Crew panel shows one lane per agent during the swarm step: how many of its drafts are working, done, or stopped, plus tokens and active seconds. It stops updating once nothing is running. "Reply by hand" posts one message as a teammate; it needs a valid handle (lowercase letters, digits, `_` or `-`) and some text.
 
 Things to know:
 

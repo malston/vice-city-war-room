@@ -27,14 +27,14 @@ def server():
 
 
 def get_json(url):
-    with urllib.request.urlopen(url) as response:
+    with urllib.request.urlopen(url, timeout=30) as response:
         return json.load(response)
 
 
 def post_json(url, body):
     request = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST")
     try:
-        with urllib.request.urlopen(request) as response:
+        with urllib.request.urlopen(request, timeout=30) as response:
             return response.status, json.load(response)
     except urllib.error.HTTPError as error:
         return error.code, json.load(error)
@@ -257,6 +257,7 @@ def test_post_step_refuses_while_nothing_is_approved(server, demo_root):
 
     assert status == 400
     assert "Nothing is approved" in body["output"]
+    assert "Drafts panel" in body["output"]
     assert not (demo_root / "outputs" / "demo" / "channel.json").exists()
 
 
@@ -358,6 +359,11 @@ def test_a_draft_edited_after_approval_is_posted_only_after_it_is_approved_again
     }
     post_json(f"{server}/api/step/post", {})
     assert not any("A different plan." in text or "Plan for mara." in text for text in posted_texts(demo_root))
+    assert queue_statuses(server) == {
+        "person-jules": "posted",
+        "person-mara": "pending",
+        "scoreboard": "posted",
+    }
 
 
 def test_the_post_uses_the_approved_text_not_whatever_is_in_the_file_now(server, demo_root):
@@ -375,9 +381,152 @@ def test_the_post_uses_the_approved_text_not_whatever_is_in_the_file_now(server,
 def test_a_long_argument_is_shortened_in_the_command_line_shown_but_not_in_the_command():
     long_text = "x" * 400
 
-    code, text = demo_ui.run("-c", f"import sys; print(len(sys.argv[1]))", long_text)
+    code, text = demo_ui.run("-c", "import sys; print(len(sys.argv[1]))", long_text)
 
     assert code == 0
     assert text.splitlines()[0].endswith("...")
     assert len(text.splitlines()[0]) < 200
     assert text.splitlines()[1] == "400"
+
+
+def run_whole_round(server):
+    for step, body in (("queue", {}), ("approve", {"all": True}), ("post", {})):
+        status, _ = post_json(f"{server}/api/step/{step}", body)
+        assert status == 200
+
+
+def test_start_clean_clears_the_post_queue_so_the_next_round_can_be_approved(server, demo_root):
+    run_whole_round(server)
+    assert set(queue_statuses(server).values()) == {"posted"}
+    (demo_root / "outputs" / "round-1" / "mara.md").write_text("*The Job: Mara*\nA second round plan.\n")
+
+    status, _ = post_json(f"{server}/api/step/reset", {})
+
+    assert status == 200
+    assert get_json(f"{server}/api/queue") == {"posts": []}
+    post_json(f"{server}/api/step/queue", {})
+    assert set(queue_statuses(server).values()) == {"pending"}
+    post_json(f"{server}/api/step/approve", {"all": True})
+    post_json(f"{server}/api/step/post", {})
+    assert any("A second round plan." in text for text in posted_texts(demo_root))
+
+
+def test_review_step_without_drafts_says_to_run_the_swarm(server, demo_root):
+    for draft in (demo_root / "outputs" / "round-1").glob("*.md"):
+        draft.unlink()
+
+    status, body = post_json(f"{server}/api/step/queue", {})
+
+    assert status == 400
+    assert "Run the swarm first" in body["output"]
+
+
+def test_review_step_without_the_scoreboard_fails_and_builds_no_queue(server, demo_root):
+    (demo_root / "outputs" / "round-1" / "scoreboard.md").unlink()
+
+    status, body = post_json(f"{server}/api/step/queue", {})
+
+    assert status == 200 and not body["ok"]
+    assert "scoreboard.md" in body["output"]
+    assert get_json(f"{server}/api/queue") == {"posts": []}
+
+
+def test_a_failed_post_leaves_the_draft_approved_and_says_how_far_it_got(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+    post_json(f"{server}/api/step/approve", {"all": True})
+    channel = demo_root / "outputs" / "demo" / "channel.json"
+    channel.parent.mkdir(parents=True)
+    channel.write_text("not json")
+
+    status, body = post_json(f"{server}/api/step/post", {})
+
+    assert status == 200 and not body["ok"]
+    assert "Posted 0 draft(s). Stopped at person-jules." in body["output"]
+    assert set(queue_statuses(server).values()) == {"approved"}
+
+
+def test_a_post_that_could_not_be_recorded_tells_you_not_to_post_it_again(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+    post_json(f"{server}/api/step/approve", {"ids": ["person-mara"]})
+    round_dir = demo_root / "outputs" / "round-1"
+    round_dir.chmod(0o555)
+    try:
+        status, body = post_json(f"{server}/api/step/post", {})
+    finally:
+        round_dir.chmod(0o755)
+
+    assert status == 200 and not body["ok"]
+    assert len(posted_texts(demo_root)) == 1
+    assert "person-mara was posted but could not be recorded" in body["output"]
+    assert "Do not click Post again" in body["output"]
+    assert queue_statuses(server)["person-mara"] == "approved"
+
+
+def test_two_posts_at_once_post_each_draft_once(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+    post_json(f"{server}/api/step/approve", {"ids": ["person-mara"]})
+    results = []
+    clicks = [threading.Thread(target=lambda: results.append(post_json(f"{server}/api/step/post", {}))) for _ in range(2)]
+
+    for click in clicks:
+        click.start()
+    for click in clicks:
+        click.join()
+
+    assert sorted(status for status, _ in results) == [200, 400]
+    assert len(posted_texts(demo_root)) == 1
+
+
+@pytest.mark.parametrize("body", [{"ids": [1]}, {"all": "yes"}, {"ids": ["--all"]}, {"ids": ["person-mara", ["x"]]}])
+def test_approve_step_rejects_ids_that_are_not_post_ids(server, demo_root, body):
+    post_json(f"{server}/api/step/queue", {})
+
+    status, _ = post_json(f"{server}/api/step/approve", body)
+
+    assert status == 400
+    assert set(queue_statuses(server).values()) == {"pending"}
+
+
+def test_a_posted_draft_cannot_be_approved_again(server, demo_root):
+    post_json(f"{server}/api/step/queue", {})
+    post_json(f"{server}/api/step/approve", {"ids": ["person-mara"]})
+    post_json(f"{server}/api/step/post", {})
+
+    post_json(f"{server}/api/step/approve", {"all": True})
+
+    assert queue_statuses(server)["person-mara"] == "posted"
+    post_json(f"{server}/api/step/post", {})
+    assert len([text for text in posted_texts(demo_root) if "Plan for mara." in text]) == 1
+
+
+@pytest.mark.parametrize("content", ["[1]", '[{"id": "x"}]', "{not json"])
+def test_an_unreadable_queue_file_is_reported_not_crashed_on(server, demo_root, content):
+    queue = demo_root / "outputs" / "round-1" / "post-queue.json"
+    queue.write_text(content)
+
+    read = urllib.request.Request(f"{server}/api/queue")
+    with pytest.raises(urllib.error.HTTPError) as read_error:
+        urllib.request.urlopen(read)
+    assert read_error.value.code == 500
+    assert "post-queue.json" in json.load(read_error.value)["error"]
+    status, body = post_json(f"{server}/api/step/post", {})
+    assert status == 400
+    assert "post-queue.json" in body["output"]
+    assert "build" in body["output"]
+
+
+def test_an_unexpected_error_in_a_step_gets_an_answer_and_the_server_keeps_working(server, monkeypatch):
+    def broken_step(_):
+        raise RuntimeError("boom")
+
+    monkeypatch.setitem(demo_ui.STEPS, "broken", broken_step)
+
+    status, body = post_json(f"{server}/api/step/broken", {})
+
+    assert status == 500 and not body["ok"]
+    assert "RuntimeError: boom" in body["output"]
+    assert get_json(f"{server}/api/output")["running"] is False
+
+
+def test_the_drafts_panel_never_builds_markup_from_draft_text():
+    assert "innerHTML" not in (demo_ui.CODE_DIR / "demo_ui.html").read_text()

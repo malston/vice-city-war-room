@@ -160,6 +160,46 @@ def test_save_then_load_round_trips(tmp_path):
     assert load_queue(path) == posts
 
 
+@pytest.mark.parametrize(
+    "content",
+    ["", "{not json", '{"a": 1}', "[1]", '[{"id": "x"}]', '[{"id": "x", "kind": "person", "handle": null, "text": "t", "status": "pending", "extra": 1}]'],
+)
+def test_a_queue_file_that_is_not_a_queue_raises_a_message_naming_the_file(tmp_path, content):
+    path = tmp_path / QUEUE_FILE
+    path.write_text(content)
+
+    with pytest.raises(ValueError) as info:
+        load_queue(path)
+
+    assert str(path) in str(info.value)
+    assert "build" in str(info.value)
+
+
+def test_saving_replaces_the_file_in_one_step_and_leaves_no_temporary_file(tmp_path):
+    path = tmp_path / QUEUE_FILE
+    path.write_text("old contents")
+    inode_before = path.stat().st_ino
+
+    save_queue(path, [Post("scoreboard", "scoreboard", None, "text", "pending")])
+
+    assert [p.name for p in tmp_path.iterdir()] == [QUEUE_FILE]
+    assert path.stat().st_ino != inode_before
+
+
+def test_a_failed_save_leaves_the_old_queue_intact(tmp_path):
+    path = tmp_path / QUEUE_FILE
+    save_queue(path, [Post("scoreboard", "scoreboard", None, "text", "pending")])
+    before = path.read_text()
+    tmp_path.chmod(0o555)
+    try:
+        with pytest.raises(OSError):
+            save_queue(path, [Post("scoreboard", "scoreboard", None, "changed", "approved")])
+    finally:
+        tmp_path.chmod(0o755)
+
+    assert path.read_text() == before
+
+
 def build_cli(tmp_path: Path):
     profiles, out = make_round(tmp_path)
     code = queue_cli.main(["build", "--profiles", str(profiles), "--out", str(out)])

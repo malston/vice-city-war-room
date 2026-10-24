@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 import threading
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -26,7 +27,7 @@ from war_room.post_queue import QUEUE_FILE, load_queue, next_post
 from war_room.profiles import HANDLE_RE
 
 CODE_DIR = Path(__file__).parent
-ROOT = CODE_DIR  # the folder the steps work in; tests point it at a temporary one
+ROOT = CODE_DIR  # the folder the steps run in and read drafts from; tests point it at a temporary one
 LAST_SESSION = ROOT / ".last_session_id"
 CREW_ORDER = (
     "The Mastermind", "The Fixer", "The Smooth Talker",
@@ -206,21 +207,27 @@ def do_post_approved(_: dict) -> tuple[bool, str]:
         post = next_post(need_queue())
         if post is None:
             break
-        ok, text = sequence(
-            ("fake_slack.py", "post", f"--text={post.text}"),
-            ("post_queue.py", "mark-posted", "--out", str(ROUND_DIR), post.id),
-        )
+        ok, text = sequence(("fake_slack.py", "post", f"--text={post.text}"))
         out += text
         if not ok:
-            return False, out
+            return False, out + f"Posted {posted} draft(s). Stopped at {post.id}.\n"
+        ok, text = sequence(("post_queue.py", "mark-posted", "--out", str(ROUND_DIR), post.id))
+        out += text
+        if not ok:
+            return False, out + (
+                f"{post.id} was posted but could not be recorded. Do not click Post again, "
+                f"or it goes out twice. Fix the problem above, then run: "
+                f"python post_queue.py mark-posted --out {ROUND_DIR} {post.id}\n"
+            )
         posted += 1
     if not posted:
-        raise ValueError("Nothing is approved yet. Approve a draft first (step 6).")
+        raise ValueError("Nothing is approved yet. Approve a draft in the Drafts panel first.")
     return True, out
 
 
 def do_reset(_: dict) -> tuple[bool, str]:
     state["kickoff_ts"] = None
+    (ROOT / ROUND_DIR / QUEUE_FILE).unlink(missing_ok=True)
     return sequence(("fake_slack.py", "reset"))
 
 
@@ -303,6 +310,9 @@ class Handler(BaseHTTPRequestHandler):
                         live["running"] = False
         except (ValueError, subprocess.TimeoutExpired) as e:
             return self.json(400, {"ok": False, "output": str(e)})
+        except Exception as e:  # the browser gets an answer; the traceback goes to this terminal
+            traceback.print_exc()
+            return self.json(500, {"ok": False, "output": f"Server error: {type(e).__name__}: {e}. See the terminal running demo_ui.py."})
         self.json(200, {"ok": ok, "output": out})
 
 

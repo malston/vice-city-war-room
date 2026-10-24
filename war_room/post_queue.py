@@ -1,6 +1,8 @@
 """The approved-post queue: nothing is returned for posting until it is approved."""
 
 import json
+import os
+import tempfile
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
@@ -43,11 +45,25 @@ def build_queue(profiles_dir: Path, out_dir: Path, existing: list[Post] | None =
 
 
 def load_queue(path: Path) -> list[Post]:
-    return [Post(**item) for item in json.loads(path.read_text())]
+    try:
+        return [Post(**item) for item in json.loads(path.read_text())]
+    except (ValueError, TypeError) as error:
+        raise ValueError(
+            f"{path} is not a valid post queue ({error}). Run `python post_queue.py build` to rebuild it."
+        ) from error
 
 
 def save_queue(path: Path, posts: list[Post]) -> None:
-    path.write_text(json.dumps([asdict(post) for post in posts], indent=2) + "\n")
+    """Replace the file in one step, so a reader never sees half of it."""
+    text = json.dumps([asdict(post) for post in posts], indent=2) + "\n"
+    handle, temp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(handle, "w") as temp:
+            temp.write(text)
+        os.replace(temp_name, path)
+    except BaseException:
+        Path(temp_name).unlink(missing_ok=True)
+        raise
 
 
 def _require_ids(posts: list[Post], ids: list[str]) -> None:
