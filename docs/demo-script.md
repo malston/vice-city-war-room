@@ -114,7 +114,7 @@ python fake_slack.py show
 
 "Watch the event lines. The four specialists start at the same time, and the Cleaner reviews the draft before anything is final."
 
-The browser buttons 5 and 6 do the same. Button 6 posts every plan without asking. Say so: "In the real flow I approve each one first."
+The browser buttons 5 to 7 do the same. Button 6 lists the drafts and nothing posts until you approve them in the Drafts panel. Say so: "Nothing goes out until I approve it."
 
 ## If someone asks
 

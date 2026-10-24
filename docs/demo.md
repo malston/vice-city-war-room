@@ -87,14 +87,15 @@ Open `http://127.0.0.1:8765`. The page binds to your own machine only, and each 
 | 3. Friends reply           | `fake_slack.py seed --delay 1`, one reply per second                                   |
 | 4. Replies become profiles | `fake_slack.py read` then `parse_profiles.py`                                          |
 | 5. Run the swarm and check | `run_war_room.py --round 1` then `check_outputs.py`                                    |
-| 6. Post the plans          | `fake_slack.py post` for every plan in `outputs/round-1`, then the scoreboard          |
+| 6. Review the drafts       | `post_queue.py build` then `list`. Nothing is posted yet                               |
+| 7. Post the approved       | `fake_slack.py post` for each approved draft, then `post_queue.py mark-posted`         |
 
 The Channel panel updates as messages arrive, and the Command output panel shows what the last button printed. The Crew panel shows one lane per agent during the swarm step: how many of its drafts are working, done, or stopped, plus tokens and active seconds. It stops updating once nothing is running. "Reply by hand" posts one message as a teammate; it needs a valid handle (lowercase letters, digits, `_` or `-`) and some text.
 
 Things to know:
 
 - Button 5 needs `ANTHROPIC_API_KEY` in the environment where the page starts (or in `.env` for `make ui`), and the key must belong to the workspace where the agents were created. It also needs the agents from the setup order.
-- Button 6 posts every plan with no approval step. Use the terminal `post` command when you want to post only some.
+- Button 6 fills the Drafts panel. Approve a draft there, or choose "Approve all". Button 7 posts only approved drafts, with the text that was approved, and refuses when none are approved. If you edit a draft file, click button 6 again. The edited draft needs approving again.
 - The page remembers the kickoff timestamp in memory. If you restart `demo_ui.py`, click "Start clean" and post the kickoff again.
 
 ## Commands
