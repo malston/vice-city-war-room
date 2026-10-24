@@ -12,12 +12,12 @@ Usage:
 """
 
 import argparse
-import os
 from pathlib import Path
 
 from anthropic import Anthropic
 
 from war_room.context import DEFAULT_FACTS, build_user_message
+from war_room.env import require_key
 from war_room.session import download_files, run_session
 
 
@@ -42,8 +42,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
+    require_key()
 
     if not Path(".coordinator_id").exists() or not Path(".environment_id").exists():
         raise SystemExit(

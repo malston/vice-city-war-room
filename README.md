@@ -114,7 +114,8 @@ The targets need `make`, `lsof`, `pgrep`, and `curl`. Run `make` on its own to l
 
 How the key is found:
 
-- A key already in your environment (for example from direnv) is used as is. Without one, the `make` targets read `.env`. Scripts you run directly, such as `python dry_run.py`, only see your environment, so export the key first (or run them in a shell where direnv has set it).
+- A key already in your environment (for example from direnv) is used as is. Without one, the `make` targets and the scripts read the repo's `.env`, wherever you run them from. Nothing in `.env` replaces a variable that is already set. `WAR_ROOM_ENV_FILE` points them at a different file.
+- Each script that needs the key prints `Using ANTHROPIC_API_KEY from the environment` or `from .env` when it starts, so you can see which one won. If you ever get "Agent not found", check this line first.
 - The key must belong to the workspace where the crew was created. A key for a different workspace fails with "Agent not found" when you run the swarm, and the Crew panel says "Session not found".
 - The crew's ids are kept in gitignored files in the repo folder (`.coordinator_id`, `.specialist_ids.json`, `.environment_id`, `.skill_ids.json`, `.last_session_id`), so each checkout has its own. To use another workspace, switch the key and run `make crew-setup FORCE=1`.
 
@@ -161,7 +162,7 @@ Change these to change the crew's output. After you edit a skill, run `python up
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | "Agent not found" in Command output         | The key belongs to a different workspace than the crew. Use the key the crew was created with, or run `make crew-setup FORCE=1` |
 | "Session not found" in the Crew panel       | Same cause                                                                                                                      |
-| "Set ANTHROPIC_API_KEY before running."     | No key where the page started. Set it, then `make ui-restart`                                                                   |
+| "Set ANTHROPIC_API_KEY before running."     | No key in your environment or in `.env`. Set one, then `make ui-restart` if the page was already running                        |
 | Command output stays on "Running..."        | The tab is older than the server. Reload the page                                                                               |
 | `make ui-stop` says a step is still running | Wait for it, or run `make ui-stop FORCE=1`                                                                                      |
 | `make ui` says the page did not come up     | Read `outputs/demo-ui.log`                                                                                                      |
