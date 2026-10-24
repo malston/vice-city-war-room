@@ -105,8 +105,7 @@ def main() -> None:
             "agents": build_roster(specialist_ids),
         },
         metadata={
-            "hackathon": "partner-basecamp-2026",
-            "track": "specialist-swarm",
+            "project": "gta6-war-room",
             "role": "coordinator",
         },
     )

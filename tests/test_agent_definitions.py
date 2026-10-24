@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import create_coordinator
 import create_specialists
 from create_specialists import SPECIALISTS
@@ -104,3 +106,16 @@ def test_modules_expose_no_deal_desk_leftovers():
     ]:
         assert "RFP" not in text
         assert "Deal Desk" not in text
+
+
+def test_scripts_carry_no_starter_kit_identifiers():
+    for script in [
+        "setup_environment.py",
+        "create_specialists.py",
+        "create_coordinator.py",
+        "create_cleaner.py",
+    ]:
+        source = Path(script).read_text()
+        assert "specialist-swarm" not in source, script
+        assert "partner-basecamp" not in source, script
+        assert "hackathon" not in source, script
