@@ -64,8 +64,14 @@ Have people reply with changes (`reply --as otto --text "Preordered: yes"`). Run
 ## Browser version
 
 ```text
-python demo_ui.py
+make ui           # start the page in the background
+make ui-status    # is it running, and is a step in flight?
+make ui-stop      # stop it
+make ui-restart   # stop, then start again
+make ui-logs      # follow its log (outputs/demo-ui.log)
 ```
+
+`make ui` reads `.env` if there is one. `make ui-stop` refuses while a step is running, because stopping the page also ends that step. Add `FORCE=1` to stop anyway. You can still run `python demo_ui.py` in a terminal if you prefer.
 
 Open `http://127.0.0.1:8765`. The page binds to your own machine only, and each button runs the same commands as the walk-through with fixed arguments.
 
@@ -82,7 +88,7 @@ The Channel panel updates as messages arrive, and the Command output panel shows
 
 Things to know:
 
-- Button 5 needs `ANTHROPIC_API_KEY` exported in the shell where you started `demo_ui.py`, plus the agents from the setup order.
+- Button 5 needs `ANTHROPIC_API_KEY`: in `.env` if you use `make ui`, or exported in the shell where you started `demo_ui.py`. It also needs the agents from the setup order.
 - Button 6 posts every plan with no approval step. Use the terminal `post` command when you want to post only some.
 - The page remembers the kickoff timestamp in memory. If you restart `demo_ui.py`, click "Start clean" and post the kickoff again.
 
