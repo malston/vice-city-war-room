@@ -89,7 +89,7 @@ pip install -r requirements.txt
 python -m pytest
 ```
 
-The default run skips the two live tests, which call the real API.
+The default run skips the tests marked `live`, which call the real API.
 
 ## Set up the crew and run the demo page
 
@@ -105,7 +105,7 @@ The targets need `make`, `lsof`, `pgrep`, and `curl`. Run `make` on its own to l
 
 | Command           | What it does                                                                                                                                                                         |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `make crew-setup` | Creates the crew, skills, and environment. Refuses if a crew is already set up here; `make crew-setup FORCE=1` makes a new one and keeps the old ids in `outputs/old-workspace-ids/` |
+| `make crew-setup` | Creates the crew, skills, and environment. Refuses if any crew id file exists here; `make crew-setup FORCE=1` makes a new crew and moves the old ids to `outputs/old-workspace-ids/<timestamp>-<pid>/` |
 | `make ui`         | Starts the demo page in the background. Its log is `outputs/demo-ui.log`                                                                                                             |
 | `make ui-status`  | Shows whether the page is running and whether a step is in flight                                                                                                                    |
 | `make ui-stop`    | Stops the page. Refuses while a step is running, because stopping also ends that step; `FORCE=1` stops it anyway                                                                     |
@@ -114,12 +114,12 @@ The targets need `make`, `lsof`, `pgrep`, and `curl`. Run `make` on its own to l
 
 How the key is found:
 
-- A key already in your environment (for example from direnv) is used as is. Without one, the `make` targets and the scripts read the repo's `.env`, wherever you run them from. Nothing in `.env` replaces a variable that is already set. `WAR_ROOM_ENV_FILE` points them at a different file.
-- Each script that needs the key prints `Using ANTHROPIC_API_KEY from the environment` or `from .env` when it starts, so you can see which one won. If you ever get "Agent not found", check this line first.
-- The key must belong to the workspace where the crew was created. A key for a different workspace fails with "Agent not found" when you run the swarm, and the Crew panel says "Session not found".
-- The crew's ids are kept in gitignored files in the repo folder (`.coordinator_id`, `.specialist_ids.json`, `.environment_id`, `.skill_ids.json`, `.last_session_id`), so each checkout has its own. To use another workspace, switch the key and run `make crew-setup FORCE=1`.
+- A key already in your environment (for example from direnv) is used as is. Without one, the scripts read the repo's `.env`, wherever you run them from. `make` does not read `.env` itself. It runs the scripts, and they do. Nothing in `.env` replaces a variable that is already set. `WAR_ROOM_ENV_FILE` points the scripts at a different file.
+- Each script that needs the key prints `Using ANTHROPIC_API_KEY from the environment` or `from .env` when it starts, so you can see which one won. If the API says "Agent not found", check this line first.
+- The key must belong to the workspace where the crew was created. A key for a different workspace gets an "Agent not found" error from the API when you run the swarm, and the Crew panel shows a "Session not found" error.
+- The crew's ids are kept in gitignored files in the repo folder (`.coordinator_id`, `.specialist_ids.json`, `.environment_id`, `.skill_ids.json`), so each checkout has its own. The swarm step also writes `.last_session_id`, which the Crew panel reads. To use another workspace, switch the key and run `make crew-setup FORCE=1`.
 
-Once the crew exists, `python -m pytest -m live` runs the live tests, and `python dry_run.py` runs the whole crew on fictional people. A dry run takes several minutes and uses API credits.
+Once the crew exists, `python -m pytest -m live` runs the live tests, and `python dry_run.py` runs the whole crew on fictional people. Besides the checks in `check_outputs.py`, it scans the drafts for phrases planted as bait and confirms the Cleaner was consulted. A dry run takes several minutes and uses API credits.
 
 ## Try it without Slack
 
@@ -130,9 +130,9 @@ Once the crew exists, `python -m pytest -m live` runs the live tests, and `pytho
 | Path                                                                                                                    | What it is                                                                                                                                          |
 | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `parse_profiles.py`, `run_war_room.py`, `check_outputs.py`, `dry_run.py`, `movers.py`, `post_queue.py`, `fake_slack.py` | The commands you run during a round                                                                                                                 |
-| `create_specialists.py`, `create_cleaner.py`, `create_coordinator.py`, `upload_skills.py`, `setup_environment.py`       | One-time setup, run in this order by `make crew-setup`                                                                                              |
+| `check_key.py`, `create_specialists.py`, `create_cleaner.py`, `create_coordinator.py`, `upload_skills.py`, `setup_environment.py` | One-time setup, run in this order by `make crew-setup`                                                                                              |
 | `demo_ui.py`, `demo_ui.html`                                                                                            | The browser demo                                                                                                                                    |
-| `war_room/`                                                                                                             | The library behind the commands: profile parsing, the round message, session streaming, output checks, the fake channel, movers, and the post queue |
+| `war_room/`                                                                                                             | The library behind the commands: key lookup, profile parsing, the round message, session streaming, output checks, the fake channel, movers, and the post queue |
 | `skills/`                                                                                                               | The seven skills the crew uses (playbooks, voice, scoring, and the post template)                                                                   |
 | `synthetic-data/`                                                                                                       | The launch facts, fictional profiles, test drafts, and sample outputs                                                                               |
 | `demo/`                                                                                                                 | The scripted replies the fake channel can seed                                                                                                      |
@@ -163,8 +163,9 @@ Change these to change the crew's output. After you edit a skill, run `python up
 | "Agent not found" in Command output         | The key belongs to a different workspace than the crew. Use the key the crew was created with, or run `make crew-setup FORCE=1` |
 | "Session not found" in the Crew panel       | Same cause                                                                                                                      |
 | "Set ANTHROPIC_API_KEY before running."     | No key in your environment or in `.env`. Set one, then `make ui-restart` if the page was already running                        |
-| Command output stays on "Running..."        | The tab is older than the server. Reload the page                                                                               |
+| Command output stays on "Running..."        | The page was loaded before the server restarted. Reload the page                                                                               |
 | `make ui-stop` says a step is still running | Wait for it, or run `make ui-stop FORCE=1`                                                                                      |
+| `make crew-setup` fails partway             | Fix what the output names, then run `make crew-setup FORCE=1`. The output also says where your old ids were moved               |
 | `make ui` says the page did not come up     | Read `outputs/demo-ui.log`                                                                                                      |
 | A check in `check_outputs.py` fails         | Do not post. The report names the file and the problem, such as a date that is not in `synthetic-data/launch-facts.md`          |
 

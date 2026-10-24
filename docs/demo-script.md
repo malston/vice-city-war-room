@@ -1,8 +1,8 @@
 # Demo script: Vice City War Room
 
-About 10 minutes. Spoken lines are in quotes. Commands go in the terminal. Steps 1 to 3 were rehearsed on `main`, and the outputs shown are what they printed.
+About 10 minutes. Spoken lines are in quotes. Commands go in the terminal. The outputs shown are what the commands print.
 
-There is also a browser version (`make ui`). Its first four buttons and the reply form were checked the same way, and its swarm button has run the live crew. The live crew is still optional, and only for after a passing dry run.
+There is also a browser version (`make ui`). It runs the same steps with buttons. The live crew is still optional, and only for after a passing dry run.
 
 ## Before you start (2 minutes)
 
@@ -118,7 +118,7 @@ The browser buttons 5 and 6 do the same. Button 6 posts every plan without askin
 
 ## If someone asks
 
-- **Is the crew running for real?** If you did the live section: "Yes, that was the real crew." If not: "It's merged and built, and I've run it end to end in rehearsal. The output checks caught a made-up date once, which is what they're for. I just haven't run it for an audience yet."
+- **Is the crew running for real?** If you did the live section: "Yes, that was the real crew." If not: "It's merged and built, and it has run end to end on fictional people. The output checks flag any date that isn't in the facts file, which is what they're for. I just haven't run it for an audience yet."
 - **Where do the facts come from?** "A facts file taken from our launch FAQ. Anything not in it, the crew has to call unconfirmed."
 - **Can it post to Slack by itself?** "No. Nothing posts without my approval."
 - **What stops it being mean?** "The Cleaner reviews every draft, and the rules say jokes go after the situation, never the person."

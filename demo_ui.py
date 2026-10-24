@@ -242,9 +242,10 @@ if __name__ == "__main__":
     print(
         f"Using ANTHROPIC_API_KEY from {source}"
         if source
-        else "No ANTHROPIC_API_KEY found. The swarm step will fail. Set it in your environment or in .env."
+        else "No ANTHROPIC_API_KEY found. The swarm step will fail. Set it in your environment or in .env.",
+        flush=True,
     )
     port = int(os.environ.get("DEMO_UI_PORT", "8765"))
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"Demo UI on http://127.0.0.1:{port}")
+    print(f"Demo UI on http://127.0.0.1:{port}", flush=True)
     server.serve_forever()

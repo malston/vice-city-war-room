@@ -83,7 +83,7 @@ For `run_war_room.py`, `--out` defaults to `outputs/round-N`. The README lists t
 
 ## Local id files
 
-The setup scripts record what they created in files in the repo folder. All of them are gitignored, so each checkout has its own, and they only mean something for the workspace that the API key belongs to.
+The setup scripts and the swarm step record what they created in files in the repo folder. All of them are gitignored, so each checkout has its own, and they only mean something for the workspace that the API key belongs to.
 
 | File                   | Written by                                        | Holds                                                     |
 | ---------------------- | ------------------------------------------------- | --------------------------------------------------------- |
@@ -118,4 +118,4 @@ python fake_slack.py reset
 
 `create_specialists.py` overwrites `.specialist_ids.json`, so run it before `create_cleaner.py`.
 
-`make crew-setup` runs these five in order. It first moves any old id files to `outputs/old-workspace-ids/<timestamp>/`, because `setup_environment.py` creates nothing while `.environment_id` exists. It refuses to run when `.coordinator_id` exists, unless you add `FORCE=1`, because every run creates new agents.
+`make crew-setup` runs these five in order. It first runs `check_key.py`, which exits with a message when no key can be found. It refuses to run while any of the four crew id files exists, unless you add exactly `FORCE=1`, because every run creates new agents. With `FORCE=1` it moves the old id files, including `.last_session_id`, to `outputs/old-workspace-ids/<timestamp>-<pid>/` first, because `setup_environment.py` creates nothing while `.environment_id` exists. When a script fails, it prints where the old ids went.

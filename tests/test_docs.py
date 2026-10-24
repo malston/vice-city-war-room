@@ -70,9 +70,19 @@ def test_flags_used_in_the_docs_are_real(doc):
     assert unknown == []
 
 
+def test_the_checks_above_have_something_to_check():
+    code = code_text(ALL_DOCS_TEXT)
+
+    assert len(MAKE_TARGETS) >= 6
+    assert set(MAKE_COMMAND.findall(code)) >= {"crew-setup", "ui"}
+    assert len(PYTHON_COMMAND.findall(code)) >= 10
+    assert len(FLAG.findall(code)) >= 10
+    assert len(LINK.findall(ALL_DOCS_TEXT)) >= 10
+
+
 @pytest.mark.parametrize("target", sorted(MAKE_TARGETS - {"help"}))
 def test_readme_documents_every_make_target(target):
-    assert f"make {target}" in (ROOT / "README.md").read_text()
+    assert re.search(rf"make {target}(?![a-z-])", (ROOT / "README.md").read_text())
 
 
 @pytest.mark.parametrize("script", SCRIPTS)

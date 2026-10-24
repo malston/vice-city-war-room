@@ -13,6 +13,7 @@ from war_room.env import ENV_FILE, KEY_NAME, load_env, require_key
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_THAT_NEED_A_KEY = [
+    ("check_key.py", []),
     ("create_specialists.py", []),
     ("create_cleaner.py", []),
     ("create_coordinator.py", []),
@@ -42,7 +43,9 @@ def env_file(tmp_path):
 
 
 def child_environment(**extra) -> dict:
-    env = {name: value for name, value in os.environ.items() if name != KEY_NAME}
+    """The environment a script runs in: no Anthropic settings of ours, and no route to the real API."""
+    env = {name: value for name, value in os.environ.items() if not name.startswith("ANTHROPIC_")}
+    env["ANTHROPIC_BASE_URL"] = "http://127.0.0.1:1"
     env.update(extra)
     return env
 
@@ -70,6 +73,27 @@ def test_a_blank_environment_key_counts_as_unset(env_file, monkeypatch):
 
     assert source == "keys.env"
     assert os.environ[KEY_NAME] == FILE_KEY
+
+
+def test_a_whitespace_only_key_counts_as_unset(env_file, monkeypatch):
+    monkeypatch.setenv(KEY_NAME, "  ")
+    assert load_env(env_file(f"{KEY_NAME}={FILE_KEY}\n")) == "keys.env"
+
+    monkeypatch.delenv(KEY_NAME)
+    assert load_env(env_file(f"{KEY_NAME}=   \n")) is None
+    assert KEY_NAME not in os.environ
+
+
+def test_an_unreadable_env_file_exits_naming_the_file(env_file):
+    path = env_file(f"{KEY_NAME}={FILE_KEY}\n")
+    path.chmod(0)
+    try:
+        with pytest.raises(SystemExit) as exit_info:
+            load_env(path)
+    finally:
+        path.chmod(0o600)
+
+    assert str(path) in str(exit_info.value)
 
 
 def test_no_key_anywhere_gives_none(env_file, tmp_path):
@@ -116,7 +140,7 @@ def test_require_key_exits_with_a_message_when_there_is_no_key(tmp_path):
         require_key(tmp_path / "does-not-exist.env")
 
     assert str(exit_info.value).startswith("Set ANTHROPIC_API_KEY before running.")
-    assert ".env" in str(exit_info.value)
+    assert "does-not-exist.env" in str(exit_info.value)
 
 
 @pytest.mark.parametrize("script, args", SCRIPTS_THAT_NEED_A_KEY)
@@ -136,8 +160,12 @@ def test_every_script_that_needs_a_key_says_how_to_provide_one(script, args, tmp
     "script, args, id_files",
     [
         ("run_war_room.py", ["--round", "1"], []),
+        ("create_specialists.py", [], []),
+        ("create_cleaner.py", [], []),
         ("create_coordinator.py", [], []),
+        ("upload_skills.py", [], []),
         ("setup_environment.py", [], [".environment_id"]),
+        ("check_key.py", [], []),
     ],
 )
 def test_scripts_read_the_key_from_the_env_file(script, args, id_files, env_file, tmp_path):
@@ -156,23 +184,24 @@ def test_scripts_read_the_key_from_the_env_file(script, args, id_files, env_file
     assert FILE_KEY not in result.stdout + result.stderr
 
 
-def test_the_demo_page_loads_the_key_so_its_steps_inherit_it(env_file):
+def test_the_demo_page_loads_the_key_so_its_steps_inherit_it(env_file, tmp_path):
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     keys = env_file(f"{KEY_NAME}={FILE_KEY}\n")
-    page = subprocess.Popen(
-        [sys.executable, "-u", str(ROOT / "demo_ui.py")],
-        cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-        env=child_environment(WAR_ROOM_ENV_FILE=str(keys), DEMO_UI_PORT=str(port)),
-    )
-    try:
-        seen = ""
-        deadline = time.time() + 15
-        while time.time() < deadline and "Demo UI on" not in seen:
-            seen += page.stdout.readline()
-    finally:
-        page.kill()
-        page.wait()
+    log = tmp_path / "page.log"
+    with log.open("w") as out:
+        page = subprocess.Popen(
+            [sys.executable, "-u", str(ROOT / "demo_ui.py")],
+            cwd=ROOT, stdout=out, stderr=subprocess.STDOUT,
+            env=child_environment(WAR_ROOM_ENV_FILE=str(keys), DEMO_UI_PORT=str(port)),
+        )
+        try:
+            deadline = time.time() + 15
+            while time.time() < deadline and "Demo UI on" not in log.read_text():
+                time.sleep(0.1)
+        finally:
+            page.kill()
+            page.wait()
 
-    assert "Using ANTHROPIC_API_KEY from keys.env" in seen
+    assert "Using ANTHROPIC_API_KEY from keys.env" in log.read_text()
