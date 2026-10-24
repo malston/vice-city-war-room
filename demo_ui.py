@@ -55,8 +55,9 @@ def crew_client() -> Anthropic:
 def summarize_threads(threads) -> list[dict]:
     lanes: dict[str, dict] = {}
     for t in threads:
-        lane = lanes.setdefault(t.agent.name, {
-            "name": t.agent.name, "threads": 0, "working": 0, "done": 0, "stopped": 0,
+        name = getattr(t.agent, "name", t.agent.type)
+        lane = lanes.setdefault(name, {
+            "name": name, "threads": 0, "working": 0, "done": 0, "stopped": 0,
             "output_tokens": 0, "active_seconds": 0.0,
         })
         lane["threads"] += 1

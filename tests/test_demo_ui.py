@@ -197,3 +197,16 @@ def test_crew_client_is_reused_between_polls(monkeypatch):
     demo_ui.crew_client.cache_clear()
 
     assert demo_ui.crew_client() is demo_ui.crew_client()
+
+
+def test_summarize_threads_names_an_advisor_thread_by_its_type():
+    advisor_thread = SimpleNamespace(
+        agent=SimpleNamespace(type="advisor", model="claude-opus-5-5"),
+        status="idle",
+        usage=None,
+        stats=None,
+    )
+
+    (lane,) = demo_ui.summarize_threads([advisor_thread])
+
+    assert lane["name"] == "advisor"
