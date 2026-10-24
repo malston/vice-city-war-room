@@ -69,9 +69,31 @@ First line `VERDICT: PASS` or `VERDICT: FIX`, then at most 5 issues.
 ```text
 python parse_profiles.py --messages FILE --kickoff-ts TS --out DIR
 python run_war_room.py --round N --profiles DIR [--facts FILE] [--prior-scoreboard FILE] [--out DIR] [--force]
+python check_outputs.py --profiles DIR --out DIR --facts FILE
+python dry_run.py [--skip-run] [--out DIR] [--facts FILE]
+python movers.py --prev FILE --curr FILE --out FILE
+python post_queue.py build --profiles DIR --out DIR
+python post_queue.py list --out DIR
+python post_queue.py approve --out DIR (ID... | --all)
+python post_queue.py next --out DIR
+python post_queue.py mark-posted --out DIR ID
 ```
 
-`--out` defaults to `outputs/round-N`.
+For `run_war_room.py`, `--out` defaults to `outputs/round-N`. The README lists the `make` targets, and the [posting guide](posting.md) explains the queue.
+
+## Local id files
+
+The setup scripts record what they created in files in the repo folder. All of them are gitignored, so each checkout has its own, and they only mean something for the workspace that the API key belongs to.
+
+| File                   | Written by                                        | Holds                                                     |
+| ---------------------- | ------------------------------------------------- | --------------------------------------------------------- |
+| `.specialist_ids.json` | `create_specialists.py`, then `create_cleaner.py` | The specialists' and the Cleaner's agent ids              |
+| `.coordinator_id`      | `create_coordinator.py`                           | The Mastermind's agent id                                 |
+| `.skill_ids.json`      | `upload_skills.py`                                | The uploaded skills' ids                                  |
+| `.environment_id`      | `setup_environment.py`                            | The cloud environment's id                                |
+| `.last_session_id`     | `run_war_room.py`                                 | The session of the latest run, which the Crew panel shows |
+
+An id from another workspace fails with "not found". Switch the key and run `make crew-setup FORCE=1` to create a crew in the new workspace.
 
 ## Demo channel
 
@@ -95,3 +117,5 @@ python fake_slack.py reset
 5. `python setup_environment.py`
 
 `create_specialists.py` overwrites `.specialist_ids.json`, so run it before `create_cleaner.py`.
+
+`make crew-setup` runs these five in order. It first moves any old id files to `outputs/old-workspace-ids/<timestamp>/`, because `setup_environment.py` creates nothing while `.environment_id` exists. It refuses to run when `.coordinator_id` exists, unless you add `FORCE=1`, because every run creates new agents.

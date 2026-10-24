@@ -2,7 +2,7 @@
 
 About 10 minutes. Spoken lines are in quotes. Commands go in the terminal. Steps 1 to 3 were rehearsed on `main`, and the outputs shown are what they printed.
 
-There is also a browser version (`python demo_ui.py`). Its first four buttons and the reply form were checked the same way. The swarm button has not been run yet, so the live crew is optional and only for after a passing dry run.
+There is also a browser version (`make ui`). Its first four buttons and the reply form were checked the same way, and its swarm button has run the live crew. The live crew is still optional, and only for after a passing dry run.
 
 ## Before you start (2 minutes)
 
@@ -11,8 +11,8 @@ There is also a browser version (`python demo_ui.py`). Its first four buttons an
 3. Open two browser tabs: the repo README and the issues list on GitHub.
 4. In terminal A, run `python fake_slack.py reset`. It prints `Channel cleared.` or `Channel already empty.`
 5. Make the terminal font big.
-6. Browser version only: in terminal B run `python demo_ui.py` and open `http://127.0.0.1:8765`.
-7. Live crew only: run `python dry_run.py` before the demo. Every line must say PASS. If it doesn't, skip the live crew section.
+6. Browser version only: in terminal B run `make ui` and open `http://127.0.0.1:8765`.
+7. Live crew only: once per workspace, run `make crew-setup`. Then run `python dry_run.py` before the demo. Every line must say PASS. If it doesn't, skip the live crew section.
 
 ## Opening (30 seconds)
 
@@ -87,7 +87,7 @@ Click the buttons in order. They run the same commands, so the same lines of tal
 3. **Replies become profiles.** The Command output panel should end with `Wrote 5 profile(s) to profiles: jules, mara, otto, pia, sol`.
 4. **Reply by hand** (optional, a good moment to involve the room): handle `zed`, text `Console: PS5`. A handle with capital letters or spaces is refused with a message.
 
-If you restart `demo_ui.py`, click Start clean and post the kickoff again.
+If you restart the page (`make ui-restart`), click Start clean and post the kickoff again.
 
 ## Step 4: where it stands (2 minutes)
 
@@ -101,10 +101,10 @@ If the dry run passed beforehand, say so and do the live crew section below. If 
 
 ## Optional: run the crew live (only after a passing dry run)
 
-The agents must already exist (the setup order in `docs/contracts.md`, done once), and the key must be exported in this terminal. Nothing loads `.env`.
+The crew must already exist (`make crew-setup`, once per workspace), and your `ANTHROPIC_API_KEY` must belong to that workspace.
 
 ```text
-export ANTHROPIC_API_KEY=<your key>
+export ANTHROPIC_API_KEY=<your key>   # skip this if direnv or .env already sets it
 python run_war_room.py --round 1 --profiles profiles
 python check_outputs.py --profiles profiles --out outputs/round-1 --facts synthetic-data/launch-facts.md
 python fake_slack.py post --file outputs/round-1/mara.md
@@ -118,7 +118,7 @@ The browser buttons 5 and 6 do the same. Button 6 posts every plan without askin
 
 ## If someone asks
 
-- **Is the crew running for real?** If you did the live section: "Yes, that was the real crew." If not: "It's merged and built. I haven't run it end to end for an audience yet, and the dry run is how I'll find out."
+- **Is the crew running for real?** If you did the live section: "Yes, that was the real crew." If not: "It's merged and built, and I've run it end to end in rehearsal. The output checks caught a made-up date once, which is what they're for. I just haven't run it for an audience yet."
 - **Where do the facts come from?** "A facts file taken from our launch FAQ. Anything not in it, the crew has to call unconfirmed."
 - **Can it post to Slack by itself?** "No. Nothing posts without my approval."
 - **What stops it being mean?** "The Cleaner reviews every draft, and the rules say jokes go after the situation, never the person."
@@ -130,12 +130,12 @@ python fake_slack.py reset
 rm -rf profiles outputs/messages.json outputs/round-1
 ```
 
-If the browser page is running, press Ctrl+C in its terminal.
+If the browser page is running, stop it with `make ui-stop`.
 
 ## If something goes wrong
 
 - **A step prints a Python error:** run `python fake_slack.py reset` and start again from Step 1.
 - **The browser page won't load, or a button turns red:** use the terminal steps. They run the same commands.
-- **The live crew fails (missing key, missing agent files, a red check):** stop, say "that's the part I'm still proving," and go back to the issues list in Step 4.
+- **The live crew fails (missing key, "Agent not found", a red check):** stop, say "that's the part I'm still proving," and go back to the issues list in Step 4. "Agent not found" means your key belongs to a different workspace than the crew; the README's troubleshooting table has the fix.
 - **`seed` is slow or stuck:** press Ctrl+C, then use `python fake_slack.py reply --as mara --text "Console: PS5"` by hand for two or three people, then continue at Step 3.
 - **`$KICKOFF_TS` is empty (for example after opening a new terminal):** run `python fake_slack.py reset` and redo from Step 1. The variable only lives in the terminal where you set it.

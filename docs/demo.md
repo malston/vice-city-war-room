@@ -1,6 +1,6 @@
 # Demo: running a round with the fake channel
 
-This walk-through needs no Slack connection. The replies come from fictional people, and the plans are posted into a channel kept in `outputs/demo/channel.json`. The swarm step (step 6) needs three things: `ANTHROPIC_API_KEY` exported in your shell (nothing loads `.env`), the agents from the setup order in [`contracts.md`](contracts.md), and a passing `python dry_run.py`. There is also a browser version of the same steps, described near the end.
+This walk-through needs no Slack connection. The replies come from fictional people, and the plans are posted into a channel kept in `outputs/demo/channel.json`. The swarm step (step 6) needs three things: a crew set up with `make crew-setup`, an `ANTHROPIC_API_KEY` for the workspace where that crew was created (the README explains), and a passing `python dry_run.py`. There is also a browser version of the same steps, described near the end.
 
 In the real flow your Claude session reads and posts through Slack. Here the same three steps are `fake_slack.py` commands: save the replies, post the kickoff, and post the plans.
 
@@ -59,7 +59,12 @@ In the real flow your Claude session reads and posts through Slack. Here the sam
 
 ## Round 2
 
-Have people reply with changes (`reply --as otto --text "Preordered: yes"`). Run steps 4 to 7 again with the same `$KICKOFF_TS`, so everyone's earlier answers carry over, and add `--prior-scoreboard outputs/round-1/scoreboard.md` to the swarm command with `--round 2`.
+Have people reply with changes (`reply --as otto --text "Preordered: yes"`). Run steps 4 to 7 again with the same `$KICKOFF_TS`, so everyone's earlier answers carry over, and add `--prior-scoreboard outputs/round-1/scoreboard.md` to the swarm command with `--round 2`. Then write and post the "who moved" post:
+
+```text
+python movers.py --prev outputs/round-1/scoreboard.md --curr outputs/round-2/scoreboard.md --out outputs/round-2/movers.md
+python fake_slack.py post --file outputs/round-2/movers.md
+```
 
 ## Browser version
 

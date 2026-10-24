@@ -63,11 +63,11 @@ What stays in your hands:
 - If a check fails, Claude tells you what failed and does not post.
 - For rounds 2 and 3, Claude also compares the new scoreboard with the last one and adds a "who moved" post.
 
-The step-by-step version, with the exact commands, is in the [runbook](docs/runbook.md). First-time setup is the order in [`docs/contracts.md`](docs/contracts.md), followed by `python dry_run.py`.
+The step-by-step version, with the exact commands, is in the [runbook](docs/runbook.md). First-time setup is `make crew-setup` (see [Set up the crew](#set-up-the-crew-and-run-the-demo-page)), followed by `python dry_run.py`.
 
 ## How it was built
 
-The project was built in five slices. Each has a closed GitHub issue with its task list.
+The project was built in six slices. Each has a closed GitHub issue with its task list.
 
 | Slice                          | What it builds                                       | Issue                                                          |
 | ------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------- |
@@ -76,10 +76,13 @@ The project was built in five slices. Each has a closed GitHub issue with its ta
 | 3. Content and voice           | Facts, playbooks, the heist tone, the score rubric   | [#3](https://github.com/malston/vice-city-war-room/issues/3)   |
 | 4. The Cleaner and the dry run | Quality checks and an end-to-end test                | [#4](https://github.com/malston/vice-city-war-room/issues/4)   |
 | 5. Post queue and round movers | The approval gate for posts and the "who moved" post | [#10](https://github.com/malston/vice-city-war-room/issues/10) |
+| 6. Fake Slack (terminal)       | A stand-in channel, so demos need no Slack           | [#13](https://github.com/malston/vice-city-war-room/issues/13) |
 
 The slices meet only at the file formats in [`docs/contracts.md`](docs/contracts.md).
 
 ## Getting started
+
+You need Python 3.10 or newer (it is developed on 3.14) and `pip`.
 
 ```bash
 pip install -r requirements.txt
@@ -88,23 +91,87 @@ python -m pytest
 
 The default run skips the two live tests, which call the real API.
 
-To create the agents and run a round you need an Anthropic API key and a workspace with multi-agent access. Export the key in your shell. Nothing loads `.env` for you.
+## Set up the crew and run the demo page
+
+The crew (the Mastermind, four specialists, and the Cleaner), their seven skills, and a cloud environment live in the Anthropic workspace your API key belongs to. The workspace needs Managed Agents multi-agent access (a research preview). Set the crew up once per workspace, then start the page:
 
 ```bash
-export ANTHROPIC_API_KEY=<your key>
+export ANTHROPIC_API_KEY=<your key>   # or let direnv set it, or put it in .env
+make crew-setup                       # creates the agents, skills, and environment
+make ui                               # starts the demo page at http://127.0.0.1:8765
 ```
 
-Then follow the setup order in [`docs/contracts.md`](docs/contracts.md). Once the agents exist, `python -m pytest -m live` runs the live tests, and `python dry_run.py` runs the whole crew on fictional people.
+The targets need `make`, `lsof`, `pgrep`, and `curl`. Run `make` on its own to list them.
+
+| Command           | What it does                                                                                                                                                                         |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `make crew-setup` | Creates the crew, skills, and environment. Refuses if a crew is already set up here; `make crew-setup FORCE=1` makes a new one and keeps the old ids in `outputs/old-workspace-ids/` |
+| `make ui`         | Starts the demo page in the background. Its log is `outputs/demo-ui.log`                                                                                                             |
+| `make ui-status`  | Shows whether the page is running and whether a step is in flight                                                                                                                    |
+| `make ui-stop`    | Stops the page. Refuses while a step is running, because stopping also ends that step; `FORCE=1` stops it anyway                                                                     |
+| `make ui-restart` | Stops the page, then starts it again                                                                                                                                                 |
+| `make ui-logs`    | Follows the page's log                                                                                                                                                               |
+
+How the key is found:
+
+- A key already in your environment (for example from direnv) is used as is. Without one, the `make` targets read `.env`. Scripts you run directly, such as `python dry_run.py`, only see your environment, so export the key first (or run them in a shell where direnv has set it).
+- The key must belong to the workspace where the crew was created. A key for a different workspace fails with "Agent not found" when you run the swarm, and the Crew panel says "Session not found".
+- The crew's ids are kept in gitignored files in the repo folder (`.coordinator_id`, `.specialist_ids.json`, `.environment_id`, `.skill_ids.json`, `.last_session_id`), so each checkout has its own. To use another workspace, switch the key and run `make crew-setup FORCE=1`.
+
+Once the crew exists, `python -m pytest -m live` runs the live tests, and `python dry_run.py` runs the whole crew on fictional people. A dry run takes several minutes and uses API credits.
 
 ## Try it without Slack
 
-`fake_slack.py` keeps a stand-in channel in `outputs/demo/channel.json`, so the whole flow runs with no Slack connection. The step-by-step walk-through is [`docs/demo.md`](docs/demo.md). For a browser version of the same steps, run:
+`fake_slack.py` keeps a stand-in channel in `outputs/demo/channel.json`, so the whole flow runs with no Slack connection. The step-by-step walk-through is [`docs/demo.md`](docs/demo.md). The page started by `make ui` runs the same steps with buttons, and shows the channel, the crew's progress, and the command output as they happen.
 
-```bash
-python demo_ui.py
-```
+## What is where
 
-and open `http://127.0.0.1:8765`.
+| Path                                                                                                                    | What it is                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parse_profiles.py`, `run_war_room.py`, `check_outputs.py`, `dry_run.py`, `movers.py`, `post_queue.py`, `fake_slack.py` | The commands you run during a round                                                                                                                 |
+| `create_specialists.py`, `create_cleaner.py`, `create_coordinator.py`, `upload_skills.py`, `setup_environment.py`       | One-time setup, run in this order by `make crew-setup`                                                                                              |
+| `demo_ui.py`, `demo_ui.html`                                                                                            | The browser demo                                                                                                                                    |
+| `war_room/`                                                                                                             | The library behind the commands: profile parsing, the round message, session streaming, output checks, the fake channel, movers, and the post queue |
+| `skills/`                                                                                                               | The seven skills the crew uses (playbooks, voice, scoring, and the post template)                                                                   |
+| `synthetic-data/`                                                                                                       | The launch facts, fictional profiles, test drafts, and sample outputs                                                                               |
+| `demo/`                                                                                                                 | The scripted replies the fake channel can seed                                                                                                      |
+| `tests/`                                                                                                                | Unit tests, plus `tests/live/` which calls the real API                                                                                             |
+| `outputs/`, `profiles/`                                                                                                 | Everything a run produces. Gitignored                                                                                                               |
+
+## What shapes what the crew says
+
+Change these to change the crew's output. After you edit a skill, run `python upload_skills.py` to push it to the agents as a new version. The facts file, the seed replies, and the kickoff post are read directly, so your edits apply the next time you run a round.
+
+| File                                                           | What it controls                                                                                                                                     |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Launch facts](synthetic-data/launch-facts.md)                 | The only game facts the crew may state. Anything not on the list must be called "unconfirmed". `check_outputs.py` checks dates and prices against it |
+| [Heist voice](skills/heist-voice/SKILL.md)                     | Tone, joke rules, and codename style. Every agent gets it                                                                                            |
+| [Job file template](skills/job-file-template/SKILL.md)         | The layout of each person's plan and of the scoreboard (Mastermind)                                                                                  |
+| [Readiness scoring](skills/readiness-scoring/SKILL.md)         | How the 0 to 100 score is worked out (Mastermind)                                                                                                    |
+| [PTO playbook](skills/pto-playbook/SKILL.md)                   | Time-off advice, from the `pto_status` field (Fixer)                                                                                                 |
+| [Family diplomacy](skills/family-diplomacy/SKILL.md)           | Spouse and family advice, from `spouse_risk` (Smooth Talker)                                                                                         |
+| [Launch readiness tech](skills/launch-readiness-tech/SKILL.md) | Console, storage, and connection advice, from `console` and `preordered` (Wheelman)                                                                  |
+| [Launch supplies](skills/launch-supplies/SKILL.md)             | Snacks and supplies advice, from `weakness` (Quartermaster)                                                                                          |
+| [Seed replies](demo/seed-round-1.json)                         | The scripted friends' replies the fake channel posts in the demo                                                                                     |
+| [Kickoff post](docs/kickoff-post.md)                           | The message that starts a round and the five fields people fill in                                                                                   |
+
+## When something goes wrong
+
+| What you see                                | Why, and what to do                                                                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| "Agent not found" in Command output         | The key belongs to a different workspace than the crew. Use the key the crew was created with, or run `make crew-setup FORCE=1` |
+| "Session not found" in the Crew panel       | Same cause                                                                                                                      |
+| "Set ANTHROPIC_API_KEY before running."     | No key where the page started. Set it, then `make ui-restart`                                                                   |
+| Command output stays on "Running..."        | The tab is older than the server. Reload the page                                                                               |
+| `make ui-stop` says a step is still running | Wait for it, or run `make ui-stop FORCE=1`                                                                                      |
+| `make ui` says the page did not come up     | Read `outputs/demo-ui.log`                                                                                                      |
+| A check in `check_outputs.py` fails         | Do not post. The report names the file and the problem, such as a date that is not in `synthetic-data/launch-facts.md`          |
+
+## Working on this repo
+
+- Branch from `main`, keep one change per PR, and write the test first. `python -m pytest` should finish with clean output.
+- When you add a command or a `make` target, document it. `tests/test_docs.py` checks the README and the pages under `docs/` for broken links, commands and flags that do not exist, and scripts or targets nobody documents.
+- The design and the plan under `docs/superpowers/` are a record of how the project was built. They are not kept in step with the code.
 
 ## Docs
 
