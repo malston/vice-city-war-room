@@ -1,5 +1,6 @@
 """
-Browser front end for the demo in docs/demo.md. Standard library only.
+Browser front end for the demo in docs/demo.md. Needs the anthropic SDK for the crew
+panel and otherwise only the standard library.
 
     python demo_ui.py        # then open http://127.0.0.1:8765
 
@@ -7,6 +8,7 @@ Each button runs the same CLI commands as the walk-through, with fixed
 arguments (nothing from the browser reaches a shell). Binds to localhost only.
 """
 
+import functools
 import json
 import re
 import subprocess
@@ -26,6 +28,9 @@ CREW_ORDER = (
     "The Mastermind", "The Fixer", "The Smooth Talker",
     "The Wheelman", "The Quartermaster", "The Cleaner",
 )
+THREAD_STATUS_LANE = {
+    "running": "working", "rescheduling": "working", "idle": "done", "terminated": "stopped",
+}
 PAGE = ROOT / "demo_ui.html"
 MESSAGES = "outputs/messages.json"
 ROUND_DIR = Path("outputs/round-1")
@@ -42,15 +47,20 @@ def emit(text: str) -> None:
         live["text"] += text
 
 
+@functools.cache
+def crew_client() -> Anthropic:
+    return Anthropic()
+
+
 def summarize_threads(threads) -> list[dict]:
     lanes: dict[str, dict] = {}
     for t in threads:
         lane = lanes.setdefault(t.agent.name, {
-            "name": t.agent.name, "threads": 0, "working": 0, "done": 0,
+            "name": t.agent.name, "threads": 0, "working": 0, "done": 0, "stopped": 0,
             "output_tokens": 0, "active_seconds": 0.0,
         })
         lane["threads"] += 1
-        lane["working" if t.status == "running" else "done"] += 1
+        lane[THREAD_STATUS_LANE[t.status]] += 1
         lane["output_tokens"] += t.usage.output_tokens if t.usage else 0
         lane["active_seconds"] += t.stats.active_seconds if t.stats else 0
     known = [lanes[name] for name in CREW_ORDER if name in lanes]
@@ -63,7 +73,7 @@ def crew_status() -> dict:
         return {"session": None, "crew": []}
     session_id = LAST_SESSION.read_text().strip()
     try:
-        threads = Anthropic().beta.sessions.threads.list(session_id, limit=100).data
+        threads = crew_client().beta.sessions.threads.list(session_id, limit=100).data
     except Exception as error:  # the page shows the message and keeps polling
         return {"session": session_id, "crew": [], "error": str(error)[:200]}
     return {"session": session_id, "crew": summarize_threads(threads)}

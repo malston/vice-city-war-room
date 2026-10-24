@@ -178,3 +178,22 @@ def test_crew_endpoint_reports_an_api_problem_instead_of_failing(server, tmp_pat
     assert data["session"] == "sesn_does_not_exist"
     assert data["crew"] == []
     assert data["error"]
+
+
+def test_summarize_threads_counts_a_rescheduling_thread_as_working():
+    (lane,) = demo_ui.summarize_threads([thread("The Fixer", "rescheduling")])
+
+    assert (lane["working"], lane["done"], lane["stopped"]) == (1, 0, 0)
+
+
+def test_summarize_threads_counts_a_terminated_thread_as_stopped_not_done():
+    (lane,) = demo_ui.summarize_threads([thread("The Fixer", "terminated"), thread("The Fixer")])
+
+    assert (lane["working"], lane["done"], lane["stopped"]) == (0, 1, 1)
+
+
+def test_crew_client_is_reused_between_polls(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    demo_ui.crew_client.cache_clear()
+
+    assert demo_ui.crew_client() is demo_ui.crew_client()

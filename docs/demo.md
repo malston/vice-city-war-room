@@ -78,7 +78,7 @@ Open `http://127.0.0.1:8765`. The page binds to your own machine only, and each 
 | 5. Run the swarm and check | `run_war_room.py --round 1` then `check_outputs.py`                                    |
 | 6. Post the plans          | `fake_slack.py post` for every plan in `outputs/round-1`, then the scoreboard          |
 
-The Channel panel updates as messages arrive, and the Command output panel shows what the last button printed. "Reply by hand" posts one message as a teammate; it needs a valid handle (lowercase letters, digits, `_` or `-`) and some text.
+The Channel panel updates as messages arrive, and the Command output panel shows what the last button printed. The Crew panel shows one lane per agent during the swarm step: how many of its drafts are working, done, or stopped, plus tokens and active seconds. It stops updating once nothing is running. "Reply by hand" posts one message as a teammate; it needs a valid handle (lowercase letters, digits, `_` or `-`) and some text.
 
 Things to know:
 

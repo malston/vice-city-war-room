@@ -128,6 +128,7 @@
   .lane { padding: 10px 12px; background: var(--ocean-deep); border-radius: 6px; border-left: 4px solid #3b3274; }
   .lane.busy { border-left-color: var(--sunset); animation: busy 1.4s ease-in-out infinite; }
   .lane.finished { border-left-color: var(--ok); }
+  .lane.stopped { border-left-color: var(--bad); }
   .lane b { display: block; color: var(--stucco); }
   .lane span { display: block; font-size: 14px; }
   .lane small { display: block; opacity: .6; font-size: 12px; }
@@ -274,6 +275,7 @@ async function refresh() {
 async function showLiveOutput() {
   try {
     const d = await (await fetch("/api/output")).json();
+    if (d.running) crewBusy = true;
     if (d.text) {
       out.textContent = d.text;
       out.scrollTop = out.scrollHeight;
@@ -281,18 +283,24 @@ async function showLiveOutput() {
   } catch (e) { /* the next poll will try again */ }
 }
 
+// The crew is only polled while a step is running or a lane is working, so an idle tab makes no
+// API calls.
+let crewBusy = true;
+
 async function refreshCrew() {
   try {
     const d = await (await fetch("/api/crew")).json();
     const box = $("#crew");
-    if (d.error) { box.textContent = d.error; return; }
+    if (d.error) { box.textContent = d.error; crewBusy = false; return; }
+    crewBusy = d.crew.some((lane) => lane.working);
     box.replaceChildren(...d.crew.map((lane) => {
       const el = document.createElement("div");
-      el.className = "lane" + (lane.working ? " busy" : lane.done === lane.threads ? " finished" : "");
+      el.className = "lane" + (lane.working ? " busy" : lane.stopped ? " stopped" : " finished");
       const name = document.createElement("b"); name.textContent = lane.name;
       const status = document.createElement("span");
-      status.textContent = lane.working
-        ? `${lane.working} working, ${lane.done} done`
+      status.textContent = lane.working || lane.stopped
+        ? [[lane.working, "working"], [lane.done, "done"], [lane.stopped, "stopped"]]
+            .filter(([n]) => n).map(([n, word]) => `${n} ${word}`).join(", ")
         : `all ${lane.threads} done`;
       const usage = document.createElement("small");
       usage.textContent = `${lane.output_tokens.toLocaleString()} tokens, ${lane.active_seconds}s active`;
@@ -330,7 +338,7 @@ $("#reply").addEventListener("click", (e) =>
 // shows replies arriving and a running step.
 setInterval(refresh, 1000);
 setInterval(showLiveOutput, 500);
-setInterval(refreshCrew, 2000);
+setInterval(() => { if (crewBusy) refreshCrew(); }, 2000);
 refreshCrew();
 
 const crab = $("#crab");
