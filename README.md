@@ -105,7 +105,3 @@ Slices 2 and 4 also need `ANTHROPIC_API_KEY` in your environment and a workspace
 - Nothing posts to Slack without the owner's approval.
 - No em dashes in anything the crew writes.
 - End-to-end tests use the real API, with no mocks.
-
-## Starter files still in the repo
-
-The Deal Desk files from the starter kit (`run_deal_desk.py`, `stretch_critic_subagent.py`, `scenario-cards.md`, `stretch-goals.md`, and the pricing, legal, and competitive skills and sample data) are still here. The final integration task decides what to delete, with the owner's approval.

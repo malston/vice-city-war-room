@@ -481,7 +481,7 @@ Only new files. A stand-in channel so the whole demo runs with no Slack connecti
 ## Task 20: Integration (Mark, after the six PRs merge)
 
 - [ ] **Step 1:** Run the setup order from Task 0, then `python dry_run.py`. Expected: PASS.
-- [ ] **Step 2:** Ask Mark before deleting the deal-desk leftovers: `run_deal_desk.py`, `stretch_critic_subagent.py`, `skills/pricing-playbook`, `skills/legal-checklist`, `skills/competitive-intel`, `synthetic-data/rfp-acme-corp.md`, `synthetic-data/past-wins.json`, `synthetic-data/product-overview.md`. Delete only what Mark approves.
+- [x] **Step 2:** Ask Mark before deleting the deal-desk leftovers: `run_deal_desk.py`, `stretch_critic_subagent.py`, `download_deliverable.py`, `scenario-cards.md`, `stretch-goals.md`, `skills/pricing-playbook`, `skills/legal-checklist`, `skills/competitive-intel`, `synthetic-data/rfp-acme-corp.md`, `synthetic-data/past-wins.json`, `synthetic-data/product-overview.md`. Delete only what Mark approves.
 - [ ] **Step 3:** Point step 6 of `docs/runbook.md` at `docs/posting.md` and add the `movers.py` command to the runbook for rounds 2 and 3.
 - [ ] **Step 4:** Walk through `docs/demo.md` end to end against the fake channel. Expected: the seeded replies become five profiles, the round runs, and the approved plans appear in `python fake_slack.py show`. Then link `docs/demo.md` from the README.
 - [ ] **Step 5:** Draft the kickoff post from `docs/kickoff-post.md` and show it to Mark. Post only after approval.
