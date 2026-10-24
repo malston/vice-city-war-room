@@ -20,6 +20,7 @@ from pathlib import Path
 
 from anthropic import Anthropic
 
+from war_room.env import load_env
 from war_room.fake_slack import DEFAULT_CHANNEL, format_message, load_channel
 from war_room.profiles import HANDLE_RE
 
@@ -235,7 +236,16 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    # The page works without a key, but its swarm step and Crew panel need one, and
+    # the steps it runs inherit this process's environment.
+    source = load_env()
+    print(
+        f"Using ANTHROPIC_API_KEY from {source}"
+        if source
+        else "No ANTHROPIC_API_KEY found. The swarm step will fail. Set it in your environment or in .env.",
+        flush=True,
+    )
     port = int(os.environ.get("DEMO_UI_PORT", "8765"))
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"Demo UI on http://127.0.0.1:{port}")
+    print(f"Demo UI on http://127.0.0.1:{port}", flush=True)
     server.serve_forever()

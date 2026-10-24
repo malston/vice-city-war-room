@@ -11,15 +11,15 @@ create_coordinator.py can reference them. This overwrites that file, so run it
 before create_cleaner.py.
 
 Usage:
-    export ANTHROPIC_API_KEY="sk-ant-..."
-    python create_specialists.py
+    python create_specialists.py    # the key comes from your environment or .env
 """
 
 import json
-import os
 from pathlib import Path
 
 from anthropic import Anthropic
+
+from war_room.env import require_key
 
 
 COMMON_RULES = (
@@ -104,9 +104,7 @@ SPECIALISTS = [
 
 
 def main() -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
+    api_key = require_key()
 
     client = Anthropic(
         api_key=api_key,

@@ -43,7 +43,7 @@ def port():
 def make(port, tmp_path):
     def run(*args, env=None):
         return subprocess.run(
-            ["make", *args, f"DEMO_UI_PORT={port}", f"PYTHON={sys.executable}", f"LOG={tmp_path / 'ui.log'}"],
+            ["make", f"DEMO_UI_PORT={port}", f"PYTHON={sys.executable}", f"LOG={tmp_path / 'ui.log'}", *args],
             cwd=ROOT, capture_output=True, text=True, timeout=60, env=env,
         )
 
@@ -160,36 +160,47 @@ def test_stop_leaves_alone_a_process_that_is_not_the_demo_page(make, port, fake_
     assert other.poll() is None
 
 
-def server_environment(port: int) -> str:
-    listener = subprocess.run(
-        ["lsof", f"-tiTCP:{port}", "-sTCP:LISTEN"], capture_output=True, text=True
-    ).stdout.split()[0]
-    return subprocess.run(["ps", "eww", "-p", listener], capture_output=True, text=True).stdout
+def page_environment(tmp_path, **extra) -> dict:
+    env = {
+        name: value for name, value in os.environ.items()
+        if not name.startswith("ANTHROPIC_") and name != "WAR_ROOM_ENV_FILE"
+    }
+    return {**env, **extra}
 
 
-def env_file_with_key(tmp_path, key: str) -> Path:
-    path = tmp_path / "env"
-    path.write_text(f"ANTHROPIC_API_KEY={key}\n")
-    return path
-
-
-def test_start_prefers_a_key_already_in_the_environment_over_the_env_file(make, port, tmp_path):
-    env_file = env_file_with_key(tmp_path, "fake-key-from-file")
-    env = {**os.environ, "ANTHROPIC_API_KEY": "fake-key-from-shell"}
-
-    started = make("ui", f"ENV_FILE={env_file}", env=env)
-
+def start_and_read_log(make, tmp_path, **extra) -> str:
+    started = make("ui", env=page_environment(tmp_path, **extra))
     assert started.returncode == 0, started.stdout + started.stderr
-    page_env = server_environment(port)
-    assert "ANTHROPIC_API_KEY=fake-key-from-shell" in page_env
-    assert "fake-key-from-file" not in page_env
+    return (tmp_path / "ui.log").read_text()
 
 
-def test_start_uses_the_env_file_key_when_the_environment_has_none(make, port, tmp_path):
-    env_file = env_file_with_key(tmp_path, "fake-key-from-file")
-    env = {name: value for name, value in os.environ.items() if name != "ANTHROPIC_API_KEY"}
+def test_start_uses_a_key_already_in_the_environment_over_the_env_file(make, tmp_path):
+    env_file = tmp_path / "keys.env"
+    env_file.write_text("ANTHROPIC_API_KEY=fake-key-from-file\n")
 
-    started = make("ui", f"ENV_FILE={env_file}", env=env)
+    log = start_and_read_log(make, tmp_path, ANTHROPIC_API_KEY="fake-key-from-shell", WAR_ROOM_ENV_FILE=str(env_file))
 
-    assert started.returncode == 0, started.stdout + started.stderr
-    assert "ANTHROPIC_API_KEY=fake-key-from-file" in server_environment(port)
+    assert "Using ANTHROPIC_API_KEY from the environment" in log
+    assert "fake-key" not in log
+
+
+def test_start_uses_the_env_file_key_when_the_environment_has_none(make, tmp_path):
+    env_file = tmp_path / "keys.env"
+    env_file.write_text("ANTHROPIC_API_KEY=fake-key-from-file\n")
+
+    log = start_and_read_log(make, tmp_path, WAR_ROOM_ENV_FILE=str(env_file))
+
+    assert "Using ANTHROPIC_API_KEY from keys.env" in log
+
+
+def test_start_without_a_key_still_serves_the_page_and_the_log_says_the_swarm_step_will_fail(make, tmp_path):
+    log = start_and_read_log(make, tmp_path, WAR_ROOM_ENV_FILE=str(tmp_path / "missing.env"))
+
+    assert "No ANTHROPIC_API_KEY found" in log
+
+
+def test_start_reports_a_page_that_does_not_come_up(make, tmp_path):
+    result = make("ui", "PYTHON=false")
+
+    assert result.returncode != 0
+    assert "did not come up" in result.stdout

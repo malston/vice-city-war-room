@@ -1,27 +1,57 @@
-# Start and stop the browser demo (demo_ui.py). Run `make` to see the targets.
+# Set up the crew and run the browser demo (demo_ui.py). Run `make` to see the targets.
 #
 # Needs make, lsof, pgrep, and curl. The page starts in the background and its
-# output goes to $(LOG). The swarm step needs ANTHROPIC_API_KEY. A key already in
-# your environment (for example from direnv) is used as is. Without one, the key
-# comes from $(ENV_FILE) if that file exists.
+# output goes to $(LOG). Setup and the swarm step need ANTHROPIC_API_KEY. The Python
+# scripts find it themselves (war_room/env.py): a key already in your environment
+# (for example from direnv) is used as is, otherwise the one in .env. Set
+# WAR_ROOM_ENV_FILE to read a different file.
 
 PYTHON ?= python
 DEMO_UI_PORT ?= 8765
 LOG ?= outputs/demo-ui.log
-ENV_FILE ?= ./.env
+ID_BACKUP ?= outputs/old-workspace-ids
 URL = http://127.0.0.1:$(DEMO_UI_PORT)
 LISTENER = lsof -tiTCP:$(DEMO_UI_PORT) -sTCP:LISTEN 2>/dev/null | head -1
+CREW_FILES = .specialist_ids.json .coordinator_id .environment_id .skill_ids.json
+ID_FILES = $(CREW_FILES) .last_session_id
 
 .DEFAULT_GOAL := help
-.PHONY: help ui ui-stop ui-restart ui-status ui-logs
+.PHONY: help crew-setup ui ui-stop ui-restart ui-status ui-logs
 
 help: ## Show this list
 	@awk -F':.*## ' '/^[a-z-]+:.*## /{printf "  make %-11s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
+crew-setup: ## Create the crew, skills, and environment in your key's workspace (FORCE=1 to redo)
+	@have=0; for f in $(CREW_FILES); do [ -e "$$f" ] && have=$$((have + 1)); done; \
+	if [ "$$have" -gt 0 ] && [ "$(FORCE)" != 1 ]; then \
+	  if [ "$$have" -lt $(words $(CREW_FILES)) ]; then \
+	    echo "A partial setup is here ($$have of $(words $(CREW_FILES)) crew id files exist)."; \
+	  else \
+	    echo "A crew is already set up here."; \
+	  fi; \
+	  echo "To create a new one in the workspace your key belongs to, run: make crew-setup FORCE=1"; \
+	  echo "That first moves the old ids to $(ID_BACKUP)/<timestamp>/"; exit 1; \
+	fi; \
+	$(PYTHON) check_key.py || exit 1; \
+	backup="$(ID_BACKUP)/$$(date +%Y%m%d-%H%M%S)-$$$$"; \
+	for f in $(ID_FILES); do \
+	  if [ -e "$$f" ]; then \
+	    mkdir -p "$$backup" && mv "$$f" "$$backup/" || { echo "Could not back up $$f to $$backup. Nothing was run."; exit 1; }; \
+	  fi; \
+	done; \
+	for script in create_specialists create_cleaner create_coordinator upload_skills setup_environment; do \
+	  echo "== $$script"; \
+	  $(PYTHON) $$script.py || { \
+	    echo "$$script.py failed."; \
+	    if [ -d "$$backup" ]; then echo "Your old ids are in $$backup"; fi; \
+	    echo "Ids from this run may be partial. Run make crew-setup FORCE=1 to start over."; exit 1; }; \
+	done; \
+	echo "Crew ready. Run: make ui"; \
+	if [ -d "$$backup" ]; then echo "Old ids are in $$backup"; fi
+
 ui: ## Start the demo page in the background
 	@mkdir -p $(dir $(LOG)); \
 	if [ -n "$$($(LISTENER))" ]; then echo "Already running at $(URL)"; exit 0; fi; \
-	[ -f "$(ENV_FILE)" ] && { saved="$$ANTHROPIC_API_KEY"; set -a; . "$(ENV_FILE)"; set +a; [ -z "$$saved" ] || ANTHROPIC_API_KEY="$$saved"; }; \
 	DEMO_UI_PORT=$(DEMO_UI_PORT) nohup $(PYTHON) demo_ui.py > $(LOG) 2>&1 & \
 	for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do \
 	  if curl -s -o /dev/null $(URL)/; then echo "Demo page running at $(URL) (log: $(LOG))"; exit 0; fi; \

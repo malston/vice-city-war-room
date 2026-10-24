@@ -7,15 +7,15 @@ Usage:
     python setup_environment.py
 """
 
-import os
 from pathlib import Path
 
 from anthropic import Anthropic
 
+from war_room.env import require_key
+
 
 def main() -> None:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
+    require_key()
 
     env_path = Path(".environment_id")
     if env_path.exists():

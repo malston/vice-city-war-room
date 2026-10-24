@@ -14,11 +14,12 @@ Usage:
 """
 
 import json
-import os
 from pathlib import Path
 
 from anthropic import Anthropic
 from anthropic.lib import files_from_dir
+
+from war_room.env import require_key
 
 
 # Map skill directory name -> agent keys that should get it
@@ -84,8 +85,7 @@ def attach_skill(client: Anthropic, agent_key: str, agent_id: str, skill_id: str
 
 
 def main() -> None:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
+    require_key()
 
     agent_ids = load_agent_ids()
     if "mastermind" not in agent_ids:

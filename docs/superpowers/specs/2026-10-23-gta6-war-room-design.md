@@ -2,6 +2,8 @@
 
 Short design. Date: 2026-10-23. Size: small project.
 
+> Status: built. This is the design as agreed on 2026-10-23, kept as a record of how the project was planned. For how it works now, read the README and `docs/contracts.md`.
+
 ## Intent
 
 Mark wants a fun, shareable agent for a team chat channel (Dana, Theo, Priya, Mark). The channel already runs a parody of an enterprise activation engagement: "go-live on the 19th", "dry run", a launch FAQ, spouse-risk jokes, `#nospoilers`.

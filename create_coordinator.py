@@ -13,10 +13,11 @@ Usage:
 """
 
 import json
-import os
 from pathlib import Path
 
 from anthropic import Anthropic
+
+from war_room.env import require_key
 
 
 COORDINATOR_SYSTEM = """\
@@ -81,9 +82,7 @@ def build_roster(specialist_ids: dict[str, str]) -> list[dict[str, str]]:
 
 
 def main() -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
+    api_key = require_key()
 
     specialist_ids_path = Path(".specialist_ids.json")
     if not specialist_ids_path.exists():

@@ -15,10 +15,11 @@ Usage:
 
 import argparse
 import json
-import os
 from pathlib import Path
 
 from anthropic import Anthropic
+
+from war_room.env import require_key
 
 
 MODEL = "claude-opus-5-5"
@@ -57,9 +58,7 @@ Be strict. If any check fails, the verdict is VERDICT: FIX.
 
 
 def make_client() -> Anthropic:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
+    api_key = require_key()
     return Anthropic(
         api_key=api_key,
         default_headers={"anthropic-beta": "managed-agents-2026-04-01"},

@@ -1,5 +1,7 @@
 # GTA 6 War Room Implementation Plan
 
+> Status: carried out. This is the plan the six slices were built from, kept as a record. The code has moved on since (for example, the deal-desk starter files it lists for deletion are gone). For how things work now, read the README and `docs/contracts.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A heist-crew swarm that turns teammates' chat replies into personal launch plans and a team scoreboard, checked by a critic before anything is posted.
