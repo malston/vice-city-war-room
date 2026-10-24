@@ -1,6 +1,6 @@
 # Contracts
 
-The four slices meet only at these decisions. If a slice needs one changed, comment on all four slice issues first.
+The scripts meet only at these decisions. If one needs to change, update every script and test that reads or writes it.
 
 ## Profile file
 
@@ -34,10 +34,10 @@ Written to `outputs/round-N/`:
 - `<handle>.md`: one per profile
 - `scoreboard.md`
 - `coordinator-transcript.txt`
-- `movers.md`: written by `movers.py` for rounds 2 and 3 (slice 5)
-- `post-queue.json`: written by `post_queue.py` (slice 5)
+- `movers.md`: written by `movers.py` for rounds 2 and 3
+- `post-queue.json`: written by `post_queue.py`
 
-Other slices ignore `movers.md` and `post-queue.json`.
+Only `post_queue.py` reads `movers.md`, and only `post_queue.py` reads or writes `post-queue.json`.
 
 Slack formatting: `*bold*`, no `**`, no `#` headings. No em dashes.
 
@@ -75,7 +75,7 @@ python run_war_room.py --round N --profiles DIR [--facts FILE] [--prior-scoreboa
 
 ## Demo channel
 
-For demos without Slack, `fake_slack.py` keeps a channel in `outputs/demo/channel.json` (override with `--channel FILE`). It is a JSON list of messages in the saved-messages format. `fake_slack.py read` writes the saved-messages file that `parse_profiles.py` reads and leaves out the bot's own posts (handle `war-room`). Other slices ignore this file.
+For demos without Slack, `fake_slack.py` keeps a channel in `outputs/demo/channel.json` (override with `--channel FILE`). It is a JSON list of messages in the saved-messages format. `fake_slack.py read` writes the saved-messages file that `parse_profiles.py` reads and leaves out the bot's own posts (handle `war-room`). The real flow does not use this file.
 
 ```text
 python fake_slack.py post (--file FILE | --text TEXT) [--fenced] [--as HANDLE] [--name NAME]

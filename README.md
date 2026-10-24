@@ -63,11 +63,11 @@ What stays in your hands:
 - If a check fails, Claude tells you what failed and does not post.
 - For rounds 2 and 3, Claude also compares the new scoreboard with the last one and adds a "who moved" post.
 
-The step-by-step version, with the exact commands, is in the runbook (`docs/runbook.md`, slice 1). First-time setup is the order in [`docs/contracts.md`](docs/contracts.md), followed by `python dry_run.py`.
+The step-by-step version, with the exact commands, is in the [runbook](docs/runbook.md). First-time setup is the order in [`docs/contracts.md`](docs/contracts.md), followed by `python dry_run.py`.
 
-## Slices
+## How it was built
 
-Each slice has a GitHub issue with a task list. Branch from `main` as `slice-N-name`.
+The project was built in five slices. Each has a closed GitHub issue with its task list.
 
 | Slice                          | What it builds                                       | Issue                                                          |
 | ------------------------------ | ---------------------------------------------------- | -------------------------------------------------------------- |
@@ -86,17 +86,36 @@ pip install -r requirements.txt
 python -m pytest
 ```
 
-Slices 2 and 4 also need `ANTHROPIC_API_KEY` in your environment and a workspace with multi-agent access.
+The default run skips the two live tests, which call the real API.
 
-1. Branch off `main`.
-2. Find your tasks in the plan and write the tests first.
-3. Open one PR when your slice is done.
+To create the agents and run a round you need an Anthropic API key and a workspace with multi-agent access. Export the key in your shell. Nothing loads `.env` for you.
+
+```bash
+export ANTHROPIC_API_KEY=<your key>
+```
+
+Then follow the setup order in [`docs/contracts.md`](docs/contracts.md). Once the agents exist, `python -m pytest -m live` runs the live tests, and `python dry_run.py` runs the whole crew on fictional people.
+
+## Try it without Slack
+
+`fake_slack.py` keeps a stand-in channel in `outputs/demo/channel.json`, so the whole flow runs with no Slack connection. The step-by-step walk-through is [`docs/demo.md`](docs/demo.md). For a browser version of the same steps, run:
+
+```bash
+python demo_ui.py
+```
+
+and open `http://127.0.0.1:8765`.
 
 ## Docs
 
 - [Design](docs/superpowers/specs/2026-10-23-gta6-war-room-design.md): what we are building and why
 - [Implementation plan](docs/superpowers/plans/2026-10-23-gta6-war-room.md): every task, with files, signatures, and tests
 - [Contracts](docs/contracts.md): the shared file formats, skill names, and commands
+- [Runbook](docs/runbook.md): running a round, step by step
+- [Posting guide](docs/posting.md): approving and posting drafts, and the "who moved" post for rounds 2 and 3
+- [Kickoff post](docs/kickoff-post.md): the text that starts a round
+- [Demo walk-through](docs/demo.md): a full round against the fake channel, no Slack needed
+- [Demo script](docs/demo-script.md): a 10-minute talk track for presenting the demo
 - [Architecture and solution slide](docs/architecture.html): the diagram and one-slide summary for the demo. Open the file in a browser.
 
 ## Ground rules
