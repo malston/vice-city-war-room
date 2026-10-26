@@ -256,7 +256,7 @@ def test_post_step_refuses_while_nothing_is_approved(server, demo_root):
     status, body = post_json(f"{server}/api/step/post", {})
 
     assert status == 400
-    assert "Nothing is approved" in body["output"]
+    assert "Nothing is waiting to be posted" in body["output"]
     assert "Drafts panel" in body["output"]
     assert not (demo_root / "outputs" / "demo" / "channel.json").exists()
 
@@ -341,7 +341,7 @@ def test_nothing_is_posted_twice(server, demo_root):
     status, body = post_json(f"{server}/api/step/post", {})
 
     assert status == 400
-    assert "Nothing is approved" in body["output"]
+    assert "Nothing is waiting to be posted" in body["output"]
     assert len(posted_texts(demo_root)) == 3
 
 
@@ -458,8 +458,60 @@ def test_a_post_that_could_not_be_recorded_tells_you_not_to_post_it_again(server
     assert status == 200 and not body["ok"]
     assert len(posted_texts(demo_root)) == 1
     assert "person-mara was posted but could not be recorded" in body["output"]
-    assert "Do not click Post again" in body["output"]
+    assert 'Do not click "Post the approved" again' in body["output"]
+    assert "in the project folder: python post_queue.py mark-posted --out outputs/round-1 person-mara" in body["output"]
     assert queue_statuses(server)["person-mara"] == "approved"
+
+
+def test_a_draft_that_cannot_be_sent_reports_how_many_went_out_before_it(server, demo_root):
+    (demo_root / "outputs" / "round-1" / "mara.md").write_text("*The Job: Mara*\nbad \x00 byte\n")
+    post_json(f"{server}/api/step/queue", {})
+    post_json(f"{server}/api/step/approve", {"all": True})
+
+    status, body = post_json(f"{server}/api/step/post", {})
+
+    assert status == 200 and not body["ok"]
+    assert "Posted 1 draft(s). Stopped at person-mara:" in body["output"]
+    assert queue_statuses(server) == {
+        "person-jules": "posted",
+        "person-mara": "approved",
+        "scoreboard": "approved",
+    }
+
+
+def test_a_record_step_that_cannot_start_still_says_the_draft_went_out(server, demo_root, monkeypatch):
+    real_sequence = demo_ui.sequence
+
+    def sequence_that_cannot_start_mark_posted(*commands):
+        if commands[0][:2] == ("post_queue.py", "mark-posted"):
+            raise OSError("too many open files")
+        return real_sequence(*commands)
+
+    monkeypatch.setattr(demo_ui, "sequence", sequence_that_cannot_start_mark_posted)
+    post_json(f"{server}/api/step/queue", {})
+    post_json(f"{server}/api/step/approve", {"ids": ["person-mara"]})
+
+    status, body = post_json(f"{server}/api/step/post", {})
+
+    assert status == 200 and not body["ok"]
+    assert len(posted_texts(demo_root)) == 1
+    assert "too many open files" in body["output"]
+    assert "person-mara was posted but could not be recorded" in body["output"]
+    assert queue_statuses(server)["person-mara"] == "approved"
+
+
+def test_start_clean_keeps_the_queue_when_the_channel_cannot_be_cleared(server, demo_root):
+    run_whole_round(server)
+    channel_dir = demo_root / "outputs" / "demo"
+    channel_dir.chmod(0o555)
+    try:
+        status, body = post_json(f"{server}/api/step/reset", {})
+    finally:
+        channel_dir.chmod(0o755)
+
+    assert status == 200 and not body["ok"]
+    assert len(posted_texts(demo_root)) == 3
+    assert set(queue_statuses(server).values()) == {"posted"}
 
 
 def test_two_posts_at_once_post_each_draft_once(server, demo_root):
@@ -512,6 +564,12 @@ def test_an_unreadable_queue_file_is_reported_not_crashed_on(server, demo_root, 
     status, body = post_json(f"{server}/api/step/post", {})
     assert status == 400
     assert "post-queue.json" in body["output"]
+    assert "Start clean" in body["output"]
+    status, _ = post_json(f"{server}/api/step/reset", {})
+    assert status == 200
+    status, _ = post_json(f"{server}/api/step/queue", {})
+    assert status == 200
+    assert set(queue_statuses(server).values()) == {"pending"}
     assert "build" in body["output"]
 
 

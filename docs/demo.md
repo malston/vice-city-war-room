@@ -2,7 +2,7 @@
 
 This walk-through needs no Slack connection. The replies come from fictional people, and the plans are posted into a channel kept in `outputs/demo/channel.json`. The swarm step (step 6 here, button 5 in the browser version) needs three things: a crew set up with `make crew-setup`, an `ANTHROPIC_API_KEY` for the workspace where that crew was created (the README explains), and a passing `python dry_run.py`. There is also a browser version of the same steps, described near the end.
 
-In the real flow your Claude session reads and posts through Slack. Here the same three steps are `fake_slack.py` commands: save the replies, post the kickoff, and post the plans.
+In the real flow your Claude session reads and posts through Slack. Here the same three steps are `fake_slack.py` commands: save the replies, post the kickoff, and post the plans. The browser version adds a review queue between the swarm and the posting.
 
 ## Walk-through
 
@@ -49,13 +49,24 @@ In the real flow your Claude session reads and posts through Slack. Here the sam
    python check_outputs.py --profiles profiles --out outputs/round-1 --facts synthetic-data/launch-facts.md
    ```
 
-7. **Post the plans you approve.** Each one appears in the channel from the bot, then the scoreboard.
+7. **Post the plans you approve.** Each one appears in the channel from the bot, then the scoreboard. The terminal version has no approval gate: you choose which files to post. The browser version builds a queue, and only drafts you approve are posted.
 
    ```text
    python fake_slack.py post --file outputs/round-1/mara.md
    python fake_slack.py post --file outputs/round-1/scoreboard.md
    python fake_slack.py show
    ```
+
+   To use the queue from the terminal (this is what buttons 6 and 7 do):
+
+   ```text
+   python post_queue.py build --profiles profiles --out outputs/round-1
+   python post_queue.py approve --out outputs/round-1 --all
+   python post_queue.py next --out outputs/round-1
+   python post_queue.py mark-posted --out outputs/round-1 person-mara
+   ```
+
+   `next` prints the text of the next approved draft, and `post_queue.py list --out outputs/round-1` shows each draft's id and status. Post the text with `fake_slack.py post --text`, then run `mark-posted` with that draft's id.
 
 ## Round 2
 

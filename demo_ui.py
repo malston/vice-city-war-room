@@ -207,28 +207,37 @@ def do_post_approved(_: dict) -> tuple[bool, str]:
         post = next_post(need_queue())
         if post is None:
             break
-        ok, text = sequence(("fake_slack.py", "post", f"--text={post.text}"))
+        try:
+            ok, text = sequence(("fake_slack.py", "post", f"--text={post.text}"))
+        except Exception as error:
+            return False, out + f"Posted {posted} draft(s). Stopped at {post.id}: {error}\n"
         out += text
         if not ok:
             return False, out + f"Posted {posted} draft(s). Stopped at {post.id}.\n"
-        ok, text = sequence(("post_queue.py", "mark-posted", "--out", str(ROUND_DIR), post.id))
+        try:
+            ok, text = sequence(("post_queue.py", "mark-posted", "--out", str(ROUND_DIR), post.id))
+        except Exception as error:
+            ok, text = False, f"{error}\n"
         out += text
         if not ok:
             return False, out + (
-                f"{post.id} was posted but could not be recorded. Do not click Post again, "
-                f"or it goes out twice. Fix the problem above, then run: "
+                f"{post.id} was posted but could not be recorded. "
+                f'Do not click "Post the approved" again, or it goes out twice. '
+                f"Fix the problem above, then run this in the project folder: "
                 f"python post_queue.py mark-posted --out {ROUND_DIR} {post.id}\n"
             )
         posted += 1
     if not posted:
-        raise ValueError("Nothing is approved yet. Approve a draft in the Drafts panel first.")
+        raise ValueError("Nothing is waiting to be posted. Approve a draft in the Drafts panel first.")
     return True, out
 
 
 def do_reset(_: dict) -> tuple[bool, str]:
-    state["kickoff_ts"] = None
-    (ROOT / ROUND_DIR / QUEUE_FILE).unlink(missing_ok=True)
-    return sequence(("fake_slack.py", "reset"))
+    ok, text = sequence(("fake_slack.py", "reset"))
+    if ok:
+        state["kickoff_ts"] = None
+        (ROOT / ROUND_DIR / QUEUE_FILE).unlink(missing_ok=True)
+    return ok, text
 
 
 STEPS = {

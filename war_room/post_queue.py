@@ -49,7 +49,8 @@ def load_queue(path: Path) -> list[Post]:
         return [Post(**item) for item in json.loads(path.read_text())]
     except (ValueError, TypeError) as error:
         raise ValueError(
-            f"{path} is not a valid post queue ({error}). Run `python post_queue.py build` to rebuild it."
+            f"{path} is not a valid post queue ({error}). Delete it and build again; this forgets which drafts were posted. "
+            "On the demo page, click Start clean (button 1), then Review the drafts (button 6)."
         ) from error
 
 

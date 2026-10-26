@@ -114,7 +114,7 @@ python fake_slack.py show
 
 "Watch the event lines. The four specialists start at the same time, and the Cleaner reviews the draft before anything is final."
 
-The browser buttons 5 to 7 run the same commands, with a review-and-approve gate before posting. Button 6 lists the drafts and nothing posts until you approve them in the Drafts panel. Say so: "Nothing goes out until I approve it."
+Browser button 5 runs the swarm and the checks. Button 6 builds the post queue and lists the drafts, and nothing posts until you approve them in the Drafts panel. Button 7 posts only the approved drafts. Say so: "Nothing goes out until I approve it."
 
 ## If someone asks
 

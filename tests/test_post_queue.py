@@ -172,7 +172,8 @@ def test_a_queue_file_that_is_not_a_queue_raises_a_message_naming_the_file(tmp_p
         load_queue(path)
 
     assert str(path) in str(info.value)
-    assert "build" in str(info.value)
+    assert "Delete it" in str(info.value)
+    assert "forgets which drafts were posted" in str(info.value)
 
 
 def test_saving_replaces_the_file_in_one_step_and_leaves_no_temporary_file(tmp_path):
