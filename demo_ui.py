@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 import threading
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -22,9 +23,11 @@ from anthropic import Anthropic
 
 from war_room.env import load_env
 from war_room.fake_slack import DEFAULT_CHANNEL, format_message, load_channel
+from war_room.post_queue import QUEUE_FILE, load_queue, next_post
 from war_room.profiles import HANDLE_RE
 
-ROOT = Path(__file__).parent
+CODE_DIR = Path(__file__).parent
+ROOT = CODE_DIR  # the folder the steps run in and read drafts from; tests point it at a temporary one
 LAST_SESSION = ROOT / ".last_session_id"
 CREW_ORDER = (
     "The Mastermind", "The Fixer", "The Smooth Talker",
@@ -33,7 +36,7 @@ CREW_ORDER = (
 THREAD_STATUS_LANE = {
     "running": "working", "rescheduling": "working", "idle": "done", "terminated": "stopped",
 }
-PAGE = ROOT / "demo_ui.html"
+PAGE = CODE_DIR / "demo_ui.html"
 MESSAGES = "outputs/messages.json"
 ROUND_DIR = Path("outputs/round-1")
 PY = sys.executable
@@ -82,11 +85,16 @@ def crew_status() -> dict:
     return {"session": session_id, "crew": summarize_threads(threads)}
 
 
+def shorten(arg: str, limit: int = 80) -> str:
+    return arg if len(arg) <= limit else arg[: limit - 3] + "..."
+
+
 def run(*cmd: str) -> tuple[int, str]:
-    header = f"$ {' '.join(cmd)}\n"
+    header = f"$ {' '.join(shorten(arg) for arg in cmd)}\n"
     emit(header)
+    script = str(CODE_DIR / cmd[0]) if cmd[0].endswith(".py") else cmd[0]
     p = subprocess.Popen(
-        [PY, "-u", *cmd], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        [PY, "-u", script, *cmd[1:]], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
     )
     timed_out = threading.Event()
 
@@ -152,16 +160,84 @@ def do_profiles(_: dict) -> tuple[bool, str]:
     )
 
 
-def do_post_plans(_: dict) -> tuple[bool, str]:
-    files = sorted(ROUND_DIR.glob("*.md"), key=lambda f: f.name == "scoreboard.md")
-    if not files:
-        raise ValueError("No plans yet. Run the swarm first (step 5).")
-    return sequence(*[("fake_slack.py", "post", "--file", str(f)) for f in files])
+def read_queue():
+    path = ROOT / ROUND_DIR / QUEUE_FILE
+    return load_queue(path) if path.exists() else None
+
+
+def need_queue():
+    posts = read_queue()
+    if posts is None:
+        raise ValueError("Review the drafts first (step 6).")
+    return posts
+
+
+def do_queue(_: dict) -> tuple[bool, str]:
+    if not any((ROOT / ROUND_DIR).glob("*.md")):
+        raise ValueError("No drafts yet. Run the swarm first (step 5).")
+    return sequence(
+        ("post_queue.py", "build", "--profiles", "profiles", "--out", str(ROUND_DIR)),
+        ("post_queue.py", "list", "--out", str(ROUND_DIR)),
+    )
+
+
+def do_approve(body: dict) -> tuple[bool, str]:
+    known = {post.id for post in need_queue()}
+    ids = body.get("ids")
+    if body.get("all") is True:
+        chosen = ("--all",)
+    elif isinstance(ids, list) and ids and all(isinstance(post_id, str) for post_id in ids):
+        unknown = [post_id for post_id in ids if post_id not in known]
+        if unknown:
+            raise ValueError("Unknown draft: " + ", ".join(unknown))
+        chosen = tuple(ids)
+    else:
+        raise ValueError("Choose a draft to approve, or approve all.")
+    return sequence(
+        ("post_queue.py", "approve", "--out", str(ROUND_DIR), *chosen),
+        ("post_queue.py", "list", "--out", str(ROUND_DIR)),
+    )
+
+
+def do_post_approved(_: dict) -> tuple[bool, str]:
+    """Post each approved draft with the text that was approved, then mark it posted."""
+    out = ""
+    posted = 0
+    while True:
+        post = next_post(need_queue())
+        if post is None:
+            break
+        try:
+            ok, text = sequence(("fake_slack.py", "post", f"--text={post.text}"))
+        except Exception as error:
+            return False, out + f"Posted {posted} draft(s). Stopped at {post.id}: {error}\n"
+        out += text
+        if not ok:
+            return False, out + f"Posted {posted} draft(s). Stopped at {post.id}.\n"
+        try:
+            ok, text = sequence(("post_queue.py", "mark-posted", "--out", str(ROUND_DIR), post.id))
+        except Exception as error:
+            ok, text = False, f"{error}\n"
+        out += text
+        if not ok:
+            return False, out + (
+                f"{post.id} was posted but could not be recorded. "
+                f'Do not click "Post the approved" again, or it goes out twice. '
+                f"Fix the problem above, then run this in the project folder: "
+                f"python post_queue.py mark-posted --out {ROUND_DIR} {post.id}\n"
+            )
+        posted += 1
+    if not posted:
+        raise ValueError("Nothing is waiting to be posted. Approve a draft in the Drafts panel first.")
+    return True, out
 
 
 def do_reset(_: dict) -> tuple[bool, str]:
-    state["kickoff_ts"] = None
-    return sequence(("fake_slack.py", "reset"))
+    ok, text = sequence(("fake_slack.py", "reset"))
+    if ok:
+        state["kickoff_ts"] = None
+        (ROOT / ROUND_DIR / QUEUE_FILE).unlink(missing_ok=True)
+    return ok, text
 
 
 STEPS = {
@@ -175,7 +251,9 @@ STEPS = {
         ("check_outputs.py", "--profiles", "profiles", "--out", "outputs/round-1",
          "--facts", "synthetic-data/launch-facts.md"),
     ),
-    "post": do_post_plans,
+    "queue": do_queue,
+    "approve": do_approve,
+    "post": do_post_approved,
 }
 
 
@@ -198,6 +276,15 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/api/output":
             with live_lock:
                 self.json(200, dict(live))
+        elif self.path == "/api/queue":
+            try:
+                posts = read_queue() or []
+            except ValueError as e:
+                return self.json(500, {"error": str(e)})
+            self.json(200, {"posts": [
+                {"id": p.id, "kind": p.kind, "handle": p.handle, "status": p.status, "text": p.text}
+                for p in posts
+            ]})
         elif self.path == "/api/channel":
             try:
                 msgs = load_channel(ROOT / DEFAULT_CHANNEL)
@@ -232,6 +319,9 @@ class Handler(BaseHTTPRequestHandler):
                         live["running"] = False
         except (ValueError, subprocess.TimeoutExpired) as e:
             return self.json(400, {"ok": False, "output": str(e)})
+        except Exception as e:  # the browser gets an answer; the traceback goes to this terminal
+            traceback.print_exc()
+            return self.json(500, {"ok": False, "output": f"Server error: {type(e).__name__}: {e}. See the terminal running demo_ui.py."})
         self.json(200, {"ok": ok, "output": out})
 
 

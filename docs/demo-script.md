@@ -82,9 +82,9 @@ If you have time, also `cat profiles/pia.json`: `console` is `null`. "Blank mean
 
 Click the buttons in order. They run the same commands, so the same lines of talk work.
 
-1. **Start clean.** Then **Post the kickoff.** "This is the post people would see."
-2. **Friends reply.** The Channel panel fills, one reply per second. "Five fictional friends, some messy on purpose."
-3. **Replies become profiles.** The Command output panel should end with `Wrote 5 profile(s) to profiles: jules, mara, otto, pia, sol`.
+1. **Start clean** (button 1). Then **Post the kickoff** (button 2). "This is the post people would see."
+2. **Friends reply** (button 3). The Channel panel fills, one reply per second. "Five fictional friends, some messy on purpose."
+3. **Replies become profiles** (button 4). The Command output panel should end with `Wrote 5 profile(s) to profiles: jules, mara, otto, pia, sol`.
 4. **Reply by hand** (optional, a good moment to involve the room): handle `zed`, text `Console: PS5`. A handle with capital letters or spaces is refused with a message.
 
 If you restart the page (`make ui-restart`), click Start clean and post the kickoff again.
@@ -114,7 +114,7 @@ python fake_slack.py show
 
 "Watch the event lines. The four specialists start at the same time, and the Cleaner reviews the draft before anything is final."
 
-The browser buttons 5 and 6 do the same. Button 6 posts every plan without asking. Say so: "In the real flow I approve each one first."
+Browser button 5 runs the swarm and the checks. Button 6 builds the post queue and lists the drafts, and nothing posts until you approve them in the Drafts panel. Button 7 posts only the approved drafts. Say so: "Nothing goes out until I approve it."
 
 ## If someone asks
 

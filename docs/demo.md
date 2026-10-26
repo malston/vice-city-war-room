@@ -1,8 +1,8 @@
 # Demo: running a round with the fake channel
 
-This walk-through needs no Slack connection. The replies come from fictional people, and the plans are posted into a channel kept in `outputs/demo/channel.json`. The swarm step (step 6) needs three things: a crew set up with `make crew-setup`, an `ANTHROPIC_API_KEY` for the workspace where that crew was created (the README explains), and a passing `python dry_run.py`. There is also a browser version of the same steps, described near the end.
+This walk-through needs no Slack connection. The replies come from fictional people, and the plans are posted into a channel kept in `outputs/demo/channel.json`. The swarm step (step 6 here, button 5 in the browser version) needs three things: a crew set up with `make crew-setup`, an `ANTHROPIC_API_KEY` for the workspace where that crew was created (the README explains), and a passing `python dry_run.py`. There is also a browser version of the same steps, described near the end.
 
-In the real flow your Claude session reads and posts through Slack. Here the same three steps are `fake_slack.py` commands: save the replies, post the kickoff, and post the plans.
+In the real flow your Claude session reads and posts through Slack. Here the same three steps are `fake_slack.py` commands: save the replies, post the kickoff, and post the plans. The browser version adds a review queue between the swarm and the posting.
 
 ## Walk-through
 
@@ -49,13 +49,24 @@ In the real flow your Claude session reads and posts through Slack. Here the sam
    python check_outputs.py --profiles profiles --out outputs/round-1 --facts synthetic-data/launch-facts.md
    ```
 
-7. **Post the plans you approve.** Each one appears in the channel from the bot, then the scoreboard.
+7. **Post the plans you approve.** Each one appears in the channel from the bot, then the scoreboard. The terminal version has no approval gate: you choose which files to post. The browser version builds a queue, and only drafts you approve are posted.
 
    ```text
    python fake_slack.py post --file outputs/round-1/mara.md
    python fake_slack.py post --file outputs/round-1/scoreboard.md
    python fake_slack.py show
    ```
+
+   To use the queue from the terminal (this is what buttons 6 and 7 do):
+
+   ```text
+   python post_queue.py build --profiles profiles --out outputs/round-1
+   python post_queue.py approve --out outputs/round-1 --all
+   python post_queue.py next --out outputs/round-1
+   python post_queue.py mark-posted --out outputs/round-1 person-mara
+   ```
+
+   `next` prints the text of the next approved draft, and `post_queue.py list --out outputs/round-1` shows each draft's id and status. Post the text with `fake_slack.py post --text`, then run `mark-posted` with that draft's id.
 
 ## Round 2
 
@@ -82,19 +93,20 @@ Open `http://127.0.0.1:8765`. The page binds to your own machine only, and each 
 
 | Button                     | Runs                                                                                   |
 | -------------------------- | -------------------------------------------------------------------------------------- |
-| 1. Start clean             | `fake_slack.py reset`                                                                  |
+| 1. Start clean             | `fake_slack.py reset`, and deletes `outputs/round-1/post-queue.json`                   |
 | 2. Post the kickoff        | `fake_slack.py post --file docs/kickoff-post.md --fenced`, and remembers the timestamp |
 | 3. Friends reply           | `fake_slack.py seed --delay 1`, one reply per second                                   |
 | 4. Replies become profiles | `fake_slack.py read` then `parse_profiles.py`                                          |
 | 5. Run the swarm and check | `run_war_room.py --round 1` then `check_outputs.py`                                    |
-| 6. Post the plans          | `fake_slack.py post` for every plan in `outputs/round-1`, then the scoreboard          |
+| 6. Review the drafts       | `post_queue.py build` then `list`. Nothing is posted yet                               |
+| 7. Post the approved       | `fake_slack.py post` for each approved draft, then `post_queue.py mark-posted`         |
 
-The Channel panel updates as messages arrive, and the Command output panel shows what the last button printed. The Crew panel shows one lane per agent during the swarm step: how many of its drafts are working, done, or stopped, plus tokens and active seconds. It stops updating once nothing is running. "Reply by hand" posts one message as a teammate; it needs a valid handle (lowercase letters, digits, `_` or `-`) and some text.
+Button numbers here differ from the terminal walk-through above, which counts saving the replies and building the profiles as separate steps. The Channel panel updates as messages arrive, and the Command output panel shows what the last button printed. The Drafts panel lists each post with its status (pending, approved, or posted), an Approve button, and Approve all. The Crew panel shows one lane per agent during the swarm step: how many of its drafts are working, done, or stopped, plus tokens and active seconds. It stops updating once nothing is running. "Reply by hand" posts one message as a teammate; it needs a valid handle (lowercase letters, digits, `_` or `-`) and some text.
 
 Things to know:
 
 - Button 5 needs `ANTHROPIC_API_KEY` in the environment where the page starts (or in `.env` for `make ui`), and the key must belong to the workspace where the agents were created. It also needs the agents from the setup order.
-- Button 6 posts every plan with no approval step. Use the terminal `post` command when you want to post only some.
+- Button 6 fills the Drafts panel. Approve a draft there, or choose "Approve all". Button 7 posts only approved drafts, with the text that was approved, and refuses when none are approved. If you edit a draft file, click button 6 again. The edited draft needs approving again.
 - The page remembers the kickoff timestamp in memory. If you restart `demo_ui.py`, click "Start clean" and post the kickoff again.
 
 ## Commands

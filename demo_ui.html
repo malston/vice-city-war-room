@@ -134,6 +134,20 @@
   .lane small { display: block; opacity: .6; font-size: 12px; }
   @keyframes busy { 50% { background: #221b57; } }
 
+  /* Drafts: every post waits here until the owner approves it. */
+  #drafts { display: grid; gap: 8px; max-height: 320px; overflow: auto; }
+  #drafts:empty::before { content: "Drafts appear here after step 6 builds the queue."; opacity: .6; }
+  .hint { margin: 0 0 10px; font-size: 14px; opacity: .75; }
+  .draft { padding: 10px 12px; background: var(--ocean-deep); border-radius: 6px; border-left: 4px solid #3b3274; }
+  .draft.approved { border-left-color: var(--sunset); }
+  .draft.posted { border-left-color: var(--ok); }
+  .draft-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .draft-head b { flex: 1; color: var(--stucco); }
+  .badge { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; opacity: .8; }
+  .draft-text { max-height: 4.6em; overflow: auto; font-size: 14px; white-space: pre-wrap; opacity: .85; }
+  .approve { padding: 4px 10px; font-weight: 700; color: var(--ocean-deep); background: var(--pool); border: 0; border-radius: 4px; cursor: pointer; }
+  .approve:disabled { opacity: .35; cursor: default; }
+
   pre {
     margin: 0; height: 220px; overflow: auto; padding: 12px; font: 13px/1.5 var(--mono); color: var(--pool);
     background: #0b0924; border-radius: 6px; white-space: pre-wrap;
@@ -163,12 +177,13 @@
     <div class="panel">
       <h2>Run the demo</h2>
       <ol>
-        <li><button class="step" data-step="reset"><b>Start clean</b><small>Clear the channel</small></button></li>
+        <li><button class="step" data-step="reset"><b>Start clean</b><small>Clear the channel and the post queue</small></button></li>
         <li><button class="step" data-step="kickoff"><b>Post the kickoff</b><small>Saves the kickoff timestamp</small></button></li>
         <li><button class="step" data-step="seed"><b>Friends reply</b><small>Five fictional people, one per second</small></button></li>
         <li><button class="step" data-step="profiles"><b>Replies become profiles</b><small>Reads the channel and parses each reply</small></button></li>
         <li><button class="step" data-step="swarm" data-fx="flame"><b>Run the swarm and check</b><small>Needs ANTHROPIC_API_KEY and agents set up</small></button></li>
-        <li><button class="step" data-step="post" data-fx="flame"><b>Post the plans</b><small>Each plan, then the scoreboard</small></button></li>
+        <li><button class="step" data-step="queue"><b>Review the drafts</b><small>Builds the post queue. Nothing is posted yet</small></button></li>
+        <li><button class="step" data-step="post" data-fx="flame"><b>Post the approved</b><small>Only approved drafts, in queue order</small></button></li>
       </ol>
     </div>
     <div class="panel">
@@ -183,6 +198,12 @@
   <div>
     <div class="panel"><h2>Channel</h2><div id="channel" aria-live="polite"></div></div>
     <div class="panel"><h2>Crew</h2><div id="crew" aria-live="polite"></div></div>
+    <div class="panel">
+      <h2>Drafts</h2>
+      <p class="hint">Approve a draft before it can be posted. If you edit a draft file, review again and it needs approving again.</p>
+      <div id="drafts" aria-live="polite"></div>
+      <button class="send" id="approve-all" disabled>Approve all</button>
+    </div>
     <div class="panel"><h2>Command output</h2><pre id="out">Ready.</pre></div>
   </div>
 </main>
@@ -310,6 +331,42 @@ async function refreshCrew() {
   } catch (e) { /* the next poll will try again */ }
 }
 
+let lastDrafts = "";
+
+function showDraftsProblem(message) {
+  lastDrafts = "";
+  $("#approve-all").disabled = true;
+  $("#drafts").textContent = message;
+}
+
+async function refreshDrafts() {
+  try {
+    const d = await (await fetch("/api/queue")).json();
+    const box = $("#drafts");
+    if (d.error) return showDraftsProblem(d.error);
+    const signature = JSON.stringify(d.posts);
+    if (signature === lastDrafts) return;
+    lastDrafts = signature;
+    $("#approve-all").disabled = !d.posts.some((post) => post.status === "pending");
+    box.replaceChildren(...d.posts.map((post) => {
+      const el = document.createElement("div");
+      el.className = "draft " + post.status;
+      const head = document.createElement("div"); head.className = "draft-head";
+      const title = document.createElement("b"); title.textContent = post.handle || post.kind;
+      const badge = document.createElement("span"); badge.className = "badge"; badge.textContent = post.status;
+      const approve = document.createElement("button"); approve.className = "approve"; approve.textContent = "Approve";
+      approve.disabled = post.status !== "pending";
+      approve.addEventListener("click", () => step("approve", approve, { ids: [post.id] }));
+      head.append(title, badge, approve);
+      const text = document.createElement("div"); text.className = "draft-text"; text.textContent = post.text;
+      el.append(head, text);   // textContent only, no HTML injection
+      return el;
+    }));
+  } catch (e) {
+    showDraftsProblem("The draft list is out of date: the page cannot reach the demo server. Reload once it is running.");
+  }
+}
+
 async function step(name, btn, body = {}) {
   btn.disabled = true;
   out.textContent = "Running...";
@@ -326,6 +383,7 @@ async function step(name, btn, body = {}) {
   } finally {
     btn.disabled = false;
     refresh();
+    refreshDrafts();
   }
 }
 
@@ -334,10 +392,14 @@ document.querySelectorAll("button[data-step]").forEach((b) =>
 $("#reply").addEventListener("click", (e) =>
   step("reply", e.target, { handle: $("#handle").value.trim(), text: $("#text").value }));
 
-// Always watch the channel and the server's command output, so a reloaded or stale tab still
-// shows replies arriving and a running step.
+$("#approve-all").addEventListener("click", (e) => step("approve", e.target, { all: true }));
+
+// Always watch the channel, the drafts, and the server's command output, so a reloaded or
+// stale tab still shows replies arriving, the approval state, and a running step.
 setInterval(refresh, 1000);
 setInterval(showLiveOutput, 500);
+setInterval(refreshDrafts, 2000);
+refreshDrafts();
 setInterval(() => { if (crewBusy) refreshCrew(); }, 2000);
 refreshCrew();
 
